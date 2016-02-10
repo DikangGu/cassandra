@@ -201,9 +201,9 @@ public class TokenAllocation
         final int replicas = rs.getReplicationFactor(dc);
 
         Topology topology = tokenMetadata.getTopology();
-        int racks = topology.getDatacenterRacks().get(dc).keySet().size();
+        int racks = topology.getDatacenterRacks().get(dc).asMap().size();
 
-        if (replicas >= racks)
+        if (racks >= replicas)
         {
             return new StrategyAdapter()
             {
@@ -253,7 +253,7 @@ public class TokenAllocation
         else
             throw new ConfigurationException(
                                             String.format("Token allocation failed: the number of racks %d in datacentre %s is lower than its replication factor %d.",
-                                                          replicas, dc, racks));
+                                                          racks, dc, replicas));
     }
 }
 

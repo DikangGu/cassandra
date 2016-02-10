@@ -137,12 +137,17 @@ public class BootStrapperTest
     private void generateFakeEndpoints(TokenMetadata tmd, int numOldNodes, int numVNodes) throws UnknownHostException
     {
         tmd.clearUnsafe();
-        IPartitioner p = StorageService.getPartitioner();
+        generateFakeEndpoints(tmd, numOldNodes, numVNodes, "0", "0");
+    }
+
+    private void generateFakeEndpoints(TokenMetadata tmd, int numOldNodes, int numVNodes, String dc, String rack) throws UnknownHostException
+    {
+        IPartitioner p = tmd.partitioner;
 
         for (int i = 1; i <= numOldNodes; i++)
         {
             // leave .1 for myEndpoint
-            InetAddress addr = InetAddress.getByName("127.0.0." + (i + 1));
+            InetAddress addr = InetAddress.getByName("127." + dc + "." + rack + "." + (i + 1));
             List<Token> tokens = Lists.newArrayListWithCapacity(numVNodes);
             for (int j = 0; j < numVNodes; ++j)
                 tokens.add(p.getRandomToken());
