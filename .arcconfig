@@ -1,0 +1,14 @@
+{
+  "conduit_uri" : "https://phabricator.fb.com/api/",
+  "project_id" : "instagram-cassandra",
+  "base" : "git:HEAD^, hg:.^",
+  "git:arc.feature.start.default" : "origin/trunk",
+  "arc.land.onto.default" : "trunk",
+  "git.default-relative-commit" : "HEAD^",
+  "phutil_libraries" : {
+    "igcassandra-arcanist" : "arcanist/"
+   },
+  "events.listeners" : [
+    "FacebookDiffCreatedListener"
+  ]
+}
