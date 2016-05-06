@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2015-present, Facebook, Inc.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the LICENSE file in
+# the root directory of this source tree.
+
+import json
+import logging
+import optparse
+import os.path
+import sys
+
+# Set up the logging early on in the process.
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+# Add the lib/ directory to $PYTHONPATH so library code can be imported.
+sys.path.append(os.path.join(os.path.dirname(__file__), './lib'))
+
+import ant
+
+parser = optparse.OptionParser(usage='usage: %prog [options] test_name',
+                               description='Run Cassandra tests')
+parser.add_option('-b', '--build', action='store_true', default=False, help='Run build step first')
+parser.add_option('-l', '--list', action='store_true', default=False, help='List available test')
+parser.add_option('-a', '--all', action='store_true', default=False, help='Run all test')
+parser.add_option('-j', '--json', action='store_true', default=False, help='Print output as Json')
+
+options, args = parser.parse_args(sys.argv[1:])
+
+if options.list:
+    tests = ant.list_unit_tests()
+    if options.json:
+        print(json.dumps(tests))
+    else:
+        for test in tests:
+            print(test)
+    sys.exit(0)
+
+if options.all:
+    result = ant.run_all_test()
+    sys.exit(0)
+
+if len(args) == 0:
+    logging.error('Need to specifiy a test name.')
+    sys.exit(1)
+
+if options.build and not ant.build():
+    sys.exit(1)
+
+if not ant.run_test(args[0]):
+    sys.exit(1)

@@ -1,0 +1,37 @@
+<project name="instagram-apache-cassandra" basedir="." default="jar">
+  <import file="build.xml"/>
+
+  <target name="build-src-unit" depends="build" description="Compile sources and unit tests">
+    <javac
+     debug="true"
+     debuglevel="${debuglevel}"
+     destdir="${test.classes}"
+     includeantruntime="false"
+     source="${source.version}"
+     target="${target.version}"
+     encoding="utf-8">
+     <classpath>
+        <path refid="cassandra.classpath"/>
+     </classpath>
+	 <compilerarg value="-XDignore.symbol.file"/>
+     <src path="${test.unit.src}"/>
+    </javac>
+
+    <!-- Non-java resources needed by the test suite -->
+    <copy todir="${test.classes}">
+      <fileset dir="${test.resources}"/>
+    </copy>
+  </target>
+
+  <target name="test-single" description="Execute specific unit tests" >
+    <testmacro inputdir="${test.unit.src}" timeout="${test.timeout}">
+      <test name="${test.name}" />
+      <jvmarg value="-Dlegacy-sstable-root=${test.data}/legacy-sstables"/>
+      <jvmarg value="-Dinvalid-legacy-sstable-root=${test.data}/invalid-legacy-sstables"/>
+      <jvmarg value="-Dmigration-sstable-root=${test.data}/migration-sstables"/>
+      <jvmarg value="-Dcassandra.ring_delay_ms=1000"/>
+      <jvmarg value="-Dcassandra.tolerate_sstable_size=true"/>
+      <jvmarg value="-Dcassandra.skip_sync=true" />
+    </testmacro>
+  </target>
+</project>
