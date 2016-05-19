@@ -5,6 +5,7 @@
 # the root directory of this source tree.
 
 import logging
+import multiprocessing
 import os
 import os.path
 import subprocess
@@ -22,20 +23,20 @@ def run_ant_target(target_name, options=[]):
     if USE_PROXY:
         env['ANT_OPTS'] = ('-Dhttp.proxyHost=fwdproxy -Dhttp.proxyPort=8080 -Djava.net.preferIPv6Addresses=true ' +
                            '-Dhttps.proxyHost=fwdproxy -Dhttps.proxyPort=8080')
-    try:
-        # Redirect subprocess's stdout to stderr, so that we could write formatted result to stdout.
-        subprocess.check_call(['ant', '-f', BUILD_FILE, target_name] + options,
-                              cwd=PROJECT_ROOT, env=env, stdout=sys.stderr)
-    except subprocess.CalledProcessError as e:
-        return False
-    return True
+    # Redirect subprocess's stdout to stderr, so that we could write formatted result to stdout.
+    subprocess.check_call(['ant', '-f', BUILD_FILE, target_name] + options,
+                            cwd=PROJECT_ROOT, env=env, stdout=sys.stderr)
 
-def build():
-    return run_ant_target('build-src-unit')
+def build(options=[]):
+    run_ant_target('build-src-unit', options)
+
+
+def artifacts(options=[]):
+    run_ant_target('artifacts', options)
 
 
 def clean():
-    return run_ant_target('clean')
+    run_ant_target('realclean')
 
 
 def list_unit_tests():
@@ -53,8 +54,8 @@ def list_unit_tests():
 
 
 def run_test(test_name):
-    return run_ant_target('test-single', ['-Dtest.name=%s'%test_name])
+    run_ant_target('test-single', ['-Dtest.name=%s'%test_name])
 
 
 def run_all_test():
-    return run_ant_target('test')
+    run_ant_target('test', ['-Dtest.runners=%s' % multiprocessing.cpu_count()])

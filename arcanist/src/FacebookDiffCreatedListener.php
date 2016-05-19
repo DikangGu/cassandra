@@ -19,13 +19,26 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
       'shell' => './scripts/build',
     );
 
+    $test_summary = array(
+      'name' => 'Test Summary',
+      'paths' => array(
+        'build/test/TESTS-TestSuites.xml',
+      ),
+      'report' => array(
+        array(
+          'type' => 'phcomment',
+        ),
+      ),
+    );
+
     $test_step = array(
       'name' => 'Test Cassandra',
       'shell' => './scripts/test --all',
+      'artifacts' => array($test_summary),
     );
 
     $cmd_args = array(
-      'name' => 'Istagram Cassandra Test',
+      'name' => 'Instagram Cassandra',
       'oncall' => 'instagram',
       'steps' => array(
         $build_step,

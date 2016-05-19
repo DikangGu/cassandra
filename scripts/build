@@ -17,5 +17,4 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 
 import ant
-if not ant.build():
-    sys.exit(1)
+ant.build()

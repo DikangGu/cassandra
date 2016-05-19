@@ -10,6 +10,7 @@ import json
 import logging
 import optparse
 import os.path
+import subprocess
 import sys
 
 # Set up the logging early on in the process.
@@ -19,6 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 sys.path.append(os.path.join(os.path.dirname(__file__), './lib'))
 
 import ant
+import util
 
 parser = optparse.OptionParser(usage='usage: %prog [options] test_name',
                                description='Run Cassandra tests')
@@ -38,16 +40,26 @@ if options.list:
             print(test)
     sys.exit(0)
 
-if options.all:
-    result = ant.run_all_test()
+if not options.all:
+    if len(args) == 0:
+        logging.error('Need to specifiy a test name.')
+        sys.exit(1)
+
+    if options.build:
+        ant.build()
+
+    ant.run_test(args[0])
     sys.exit(0)
 
-if len(args) == 0:
-    logging.error('Need to specifiy a test name.')
-    sys.exit(1)
+test_summary = os.path.join(util.PROJECT_ROOT, 'build/test/TESTS-TestSuites.xml')
 
-if options.build and not ant.build():
-    sys.exit(1)
+if os.path.isfile(test_summary):
+    os.remove(test_summary)
 
-if not ant.run_test(args[0]):
-    sys.exit(1)
+try:
+    ant.run_all_test()
+except subprocess.CalledProcessError:
+    # If the test summary is generated, suppress the error so that legocastle could
+    # upload the test report.
+    if not os.path.isfile(test_summary):
+        raise
