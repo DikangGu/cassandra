@@ -14,9 +14,24 @@ final class FacebookDiffCreatedListener extends PhutilEventListener {
 
     $diffID = $event->getValue('diffID');
 
+    $build_artifact = array(
+      'name' => 'rpm',
+      'paths' => array(
+        'build/cassandra.rpm',
+      ),
+      'report' => array(
+        array(
+          'type' => 'phcomment',
+        ),
+      ),
+    );
+
     $build_step = array(
       'name' => 'Build Cassandra',
       'shell' => './scripts/build',
+      'artifacts' => array(
+        $build_artifact,
+      ),
     );
 
     $test_summary = array(

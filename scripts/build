@@ -8,6 +8,7 @@
 
 import logging
 import os.path
+import shutil
 import sys
 
 # Set up the logging early on in the process.
@@ -17,4 +18,15 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 
 import ant
-ant.build()
+import util
+
+instagram_version = util.get_instagram_version()
+options = ['-Dbase.version=%s' % instagram_version, '-Dversion=%s' % instagram_version]
+
+ant.clean()
+ant.build(options)
+ant.artifacts(options)
+artifact_file = os.path.join(util.PROJECT_ROOT,
+                             'build/apache-cassandra-%s-bin.tar.gz' % instagram_version)
+rpm_file = util.rpmbuild(artifact_file, instagram_version)
+shutil.copy(rpm_file, os.path.join(util.PROJECT_ROOT, 'build/cassandra.rpm'))

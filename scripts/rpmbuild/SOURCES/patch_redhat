@@ -1,0 +1,310 @@
+diff -rupN apache-cassandra-1.1.0-src/lib/licenses/mx4j-tools.txt apache-cassandra-1.1.0-src-patched/lib/licenses/mx4j-tools.txt
+--- apache-cassandra-1.1.0-src/lib/licenses/mx4j-tools.txt	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/lib/licenses/mx4j-tools.txt	2012-05-30 16:38:36.870737825 -0700
+@@ -0,0 +1,52 @@
++/* ====================================================================
++ * The MX4J License, Version 1.0
++ *
++ * Copyright (c) 2001-2004 by the MX4J contributors.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. The end-user documentation included with the redistribution,
++ *    if any, must include the following acknowledgment:
++ *       "This product includes software developed by the
++ *        MX4J project (http://mx4j.sourceforge.net)."
++ *    Alternately, this acknowledgment may appear in the software itself,
++ *    if and wherever such third-party acknowledgments normally appear.
++ *
++ * 4. The name "MX4J" must not be used to endorse or promote
++ *    products derived from this software without prior written
++ *    permission. 
++ *    For written permission, please contact biorn_steedom@users.sourceforge.net
++ *
++ * 5. Products derived from this software may not be called "MX4J",
++ *    nor may "MX4J" appear in their name, without prior written
++ *    permission of Simone Bordet.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE MX4J CONTRIBUTORS 
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This software consists of voluntary contributions made by many
++ * individuals on behalf of the MX4J project.  For more information on
++ * MX4J, please see
++ * <http://mx4j.sourceforge.net>.
++ */
+Binary files apache-cassandra-1.1.0-src/lib/mx4j-tools.jar and apache-cassandra-1.1.0-src-patched/lib/mx4j-tools.jar differ
+diff -rupN apache-cassandra-1.1.0-src/redhat/apache-cassandra.spec apache-cassandra-1.1.0-src-patched/redhat/apache-cassandra.spec
+--- apache-cassandra-1.1.0-src/redhat/apache-cassandra.spec	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/redhat/apache-cassandra.spec	2012-02-22 06:20:48.000000000 -0800
+@@ -0,0 +1,126 @@
++%define __jar_repack %{nil}
++
++%global username cassandra
++
++%define relname %{name}-%{version}-%{release}
++
++Name:           apache-cassandra
++Version:        0.7.0
++Release:        rc3
++Summary:        Cassandra is a highly scalable, eventually consistent, distributed, structured key-value store.
++
++Group:          Development/Libraries
++License:        Apache Software License
++URL:            http://cassandra.apache.org/
++Source0:        http://www.ibiblio.org/pub/mirrors/apache/%{username}/%{version}/%{relname}-src.tar.gz
++BuildRoot:      %{_tmppath}/%{relname}-root-%(%{__id_u} -n)
++
++BuildRequires: java-devel
++BuildRequires: jpackage-utils
++BuildRequires: ant
++BuildRequires: ant-nodeps
++
++Conflicts:     cassandra
++Obsoletes:     cassandra07
++
++Requires:      java >= 1.6.0
++Requires:      jna  >= 3.2.7
++Requires:      jpackage-utils
++Requires(pre): user(cassandra)
++Requires(pre): group(cassandra)
++Requires(pre): shadow-utils
++Provides:      user(cassandra)
++Provides:      group(cassandra)
++
++BuildArch:      noarch
++
++%description
++Cassandra brings together the distributed systems technologies from Dynamo
++and the data model from Google's BigTable. Like Dynamo, Cassandra is
++eventually consistent. Like BigTable, Cassandra provides a ColumnFamily-based
++data model richer than typical key/value systems.
++
++For more information see http://cassandra.apache.org/
++
++%prep
++%setup -q -n %{relname}-src
++
++%build
++ant clean jar -Drelease=true
++
++%install
++%{__rm} -rf %{buildroot}
++mkdir -p %{buildroot}%{_sysconfdir}/%{username}/
++mkdir -p %{buildroot}/usr/share/%{username}
++mkdir -p %{buildroot}/usr/share/%{username}/lib
++mkdir -p %{buildroot}/usr/share/%{username}/default.conf
++mkdir -p %{buildroot}/etc/%{username}/default.conf
++mkdir -p %{buildroot}/etc/rc.d/init.d/
++mkdir -p %{buildroot}/etc/security/limits.d/
++mkdir -p %{buildroot}/etc/default/
++mkdir -p %{buildroot}/usr/sbin
++mkdir -p %{buildroot}/usr/bin
++cp -p conf/* %{buildroot}/etc/%{username}/default.conf
++cp -p conf/* %{buildroot}/usr/share/%{username}/default.conf
++cp -p redhat/%{username} %{buildroot}/etc/rc.d/init.d/
++cp -p redhat/%{username}.conf %{buildroot}/etc/security/limits.d/
++cp -p redhat/default %{buildroot}/etc/default/%{username}
++cp -p lib/*.jar %{buildroot}/usr/share/%{username}/lib
++mv redhat/cassandra.in.sh %{buildroot}/usr/share/%{username}
++rm bin/cassandra.in.sh
++mv bin/cassandra %{buildroot}/usr/sbin
++rm bin/*.bat 
++cp -p bin/* %{buildroot}/usr/bin
++# Handle the case of interim SNAPHOST builds
++cp build/%{relname}*jar %{buildroot}/usr/share/%{username}/lib
++mkdir -p %{buildroot}/var/lib/%{username}/commitlog
++mkdir -p %{buildroot}/var/lib/%{username}/data
++mkdir -p %{buildroot}/var/lib/%{username}/saved_caches
++mkdir -p %{buildroot}/var/run/%{username}
++mkdir -p %{buildroot}/var/log/%{username}
++
++%clean
++%{__rm} -rf %{buildroot}
++
++%pre
++getent group %{username} >/dev/null || groupadd -r %{username}
++getent passwd %{username} >/dev/null || \
++useradd -d /usr/share/%{username} -g %{username} -M -r %{username}
++exit 0
++
++%preun
++# only delete user on removal, not upgrade
++if [ "$1" = "0" ]; then
++    userdel %{username}
++fi
++
++%files
++%defattr(-,root,root,0755)
++%doc CHANGES.txt LICENSE.txt README.txt NEWS.txt NOTICE.txt
++%attr(755,root,root) %{_bindir}/*
++%attr(755,root,root) %{_sbindir}/cassandra
++%attr(755,root,root) /etc/rc.d/init.d/%{username}
++%attr(755,root,root) /etc/default/%{username}
++%attr(755,root,root) /etc/security/limits.d/%{username}.conf
++%attr(755,%{username},%{username}) /usr/share/%{username}*
++%attr(755,%{username},%{username}) %config(noreplace) /%{_sysconfdir}/%{username}
++%attr(755,%{username},%{username}) %config(noreplace) /var/lib/%{username}/*
++%attr(755,%{username},%{username}) /var/log/%{username}*
++%attr(755,%{username},%{username}) /var/run/%{username}*
++
++%post
++alternatives --install /etc/%{username}/conf %{username} /etc/%{username}/default.conf/ 0
++exit 0
++
++%postun
++# only delete alternative on removal, not upgrade
++if [ "$1" = "0" ]; then
++    alternatives --remove %{username} /etc/%{username}/default.conf/
++fi
++exit 0
++
++%changelog
++* Tue Aug 03 2010 Nick Bailey <nicholas.bailey@rackpace.com> - 0.7.0-1
++- Updated to make configuration easier and changed package name.
++* Mon Jul 05 2010 Peter Halliday <phalliday@excelsiorsystems.net> - 0.6.3-1
++- Initial package
+diff -rupN apache-cassandra-1.1.0-src/redhat/cassandra apache-cassandra-1.1.0-src-patched/redhat/cassandra
+--- apache-cassandra-1.1.0-src/redhat/cassandra	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/redhat/cassandra	2012-05-22 14:30:18.736452430 -0700
+@@ -0,0 +1,80 @@
++#!/bin/bash
++#
++# /etc/init.d/cassandra
++#
++# Startup script for Cassandra
++# 
++# chkconfig: 2345 20 80
++# description: Starts and stops Cassandra
++
++. /etc/rc.d/init.d/functions
++
++export CASSANDRA_HOME=/usr/share/cassandra/
++export CASSANDRA_INCLUDE=/usr/share/cassandra/cassandra.in.sh
++export CASSANDRA_CONF=/etc/cassandra/conf
++export CASSANDRA_OWNR=cassandra
++NAME="cassandra"
++log_file=/var/log/cassandra/cassandra.log
++pid_file=/var/run/cassandra/cassandra.pid
++CASSANDRA_PROG=/usr/sbin/cassandra
++
++# The first existing directory is used for JAVA_HOME if needed.
++JVM_SEARCH_DIRS="/usr/lib/jvm/jre /usr/lib/jvm/jre-1.6.* /usr/lib/jvm/java-1.6.*/jre"
++
++# Read configuration variable file if it is present
++[ -r /etc/default/$NAME ] && . /etc/default/$NAME
++
++# If JAVA_HOME has not been set, try to determine it.
++if [ -z "$JAVA_HOME" ]; then
++    # If java is in PATH, use a JAVA_HOME that corresponds to that. This is
++    # both consistent with how the upstream startup script works, and with
++    # the use of alternatives to set a system JVM (as is done on Debian and
++    # Red Hat derivatives).
++    java="`/usr/bin/which java 2>/dev/null`"
++    if [ -n "$java" ]; then
++        java=`readlink --canonicalize "$java"`
++        JAVA_HOME=`dirname "\`dirname \$java\`"`
++    else
++        # No JAVA_HOME set and no java found in PATH; search for a JVM.
++        for jdir in $JVM_SEARCH_DIRS; do
++            if [ -x "$jdir/bin/java" ]; then
++                JAVA_HOME="$jdir"
++                break
++            fi
++        done
++        # if JAVA_HOME is still empty here, punt.
++    fi
++fi
++JAVA="$JAVA_HOME/bin/java"
++export JAVA_HOME JAVA
++
++case "$1" in
++    start)
++        # Cassandra startup
++        echo -n "Starting Cassandra: "
++        su $CASSANDRA_OWNR -c "$CASSANDRA_PROG -p $pid_file" > $log_file 2>&1
++        echo "OK"
++        ;;
++    stop)
++        # Cassandra shutdown
++        echo -n "Shutdown Cassandra: "
++        su $CASSANDRA_OWNR -c "kill `cat $pid_file`"
++        echo "OK"
++        ;;
++    reload|restart)
++        $0 stop
++	# sleep just a little bit before we restart to give the stop a chance to
++	# actually stop
++	sleep 10
++        $0 start
++        ;;
++    status)
++        status -p $pid_file cassandra
++        ;;
++    *)
++        echo "Usage: `basename $0` start|stop|status|restart|reload"
++        exit 1
++esac
++
++exit 0
++
+diff -rupN apache-cassandra-1.1.0-src/redhat/cassandra.conf apache-cassandra-1.1.0-src-patched/redhat/cassandra.conf
+--- apache-cassandra-1.1.0-src/redhat/cassandra.conf	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/redhat/cassandra.conf	2012-02-22 06:20:48.000000000 -0800
+@@ -0,0 +1,2 @@
++cassandra   -   memlock     unlimited
++cassandra   -   nofile      100000
+diff -rupN apache-cassandra-1.1.0-src/redhat/cassandra.in.sh apache-cassandra-1.1.0-src-patched/redhat/cassandra.in.sh
+--- apache-cassandra-1.1.0-src/redhat/cassandra.in.sh	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/redhat/cassandra.in.sh	2012-02-22 06:20:48.000000000 -0800
+@@ -0,0 +1,18 @@
++
++# The directory where Cassandra's configs live (required)
++CASSANDRA_CONF=/etc/cassandra/conf
++
++# The java classpath (required)
++if [ -n "$CLASSPATH" ]; then
++	CLASSPATH=$CLASSPATH:$CASSANDRA_CONF
++else
++	CLASSPATH=$CASSANDRA_CONF
++fi
++
++# use JNA if installed in standard location
++[ -r /usr/share/java/jna.jar ] && CLASSPATH="$CLASSPATH:/usr/share/java/jna.jar"
++
++
++for jar in /usr/share/cassandra/lib/*.jar; do
++    CLASSPATH=$CLASSPATH:$jar
++done
+diff -rupN apache-cassandra-1.1.0-src/redhat/default apache-cassandra-1.1.0-src-patched/redhat/default
+--- apache-cassandra-1.1.0-src/redhat/default	1969-12-31 16:00:00.000000000 -0800
++++ apache-cassandra-1.1.0-src-patched/redhat/default	2012-02-22 06:20:48.000000000 -0800
+@@ -0,0 +1,7 @@
++# NOTICE: See also /etc/cassandra/cassandra-env.sh
++
++# EXTRA_CLASSPATH provides the means to extend Cassandra's classpath with
++# additional libraries.  It is formatted as a colon-delimited list of
++# class directories and/or jar files.  For example, to enable the
++# JMX-to-web bridge install libmx4j-java and uncomment the following.
++#EXTRA_CLASSPATH="/usr/share/java/mx4j-tools.jar"
