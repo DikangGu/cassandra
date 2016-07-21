@@ -37,6 +37,11 @@ import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.io.sstable.ISSTableScanner;
+import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.node.JsonNodeFactory;
+import org.codehaus.jackson.node.ObjectNode;
 
 public class LeveledCompactionStrategy extends AbstractCompactionStrategy
 {
@@ -53,16 +58,16 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
         int configuredMaxSSTableSize = 160;
         SizeTieredCompactionStrategyOptions localOptions = new SizeTieredCompactionStrategyOptions(options);
         if (options != null)
-        {             
-            if (options.containsKey(SSTABLE_SIZE_OPTION))             
-            {                 
-                configuredMaxSSTableSize = Integer.parseInt(options.get(SSTABLE_SIZE_OPTION));                 
-                if (!Boolean.getBoolean("cassandra.tolerate_sstable_size"))                 
-                {                     
+        {
+            if (options.containsKey(SSTABLE_SIZE_OPTION))
+            {
+                configuredMaxSSTableSize = Integer.parseInt(options.get(SSTABLE_SIZE_OPTION));
+                if (!Boolean.getBoolean("cassandra.tolerate_sstable_size"))
+                {
                     if (configuredMaxSSTableSize >= 1000)
                         logger.warn("Max sstable size of {}MB is configured for {}.{}; having a unit of compaction this large is probably a bad idea",
                                 configuredMaxSSTableSize, cfs.name, cfs.getColumnFamilyName());
-                    if (configuredMaxSSTableSize < 50)  
+                    if (configuredMaxSSTableSize < 50)
                         logger.warn("Max sstable size of {}MB is configured for {}.{}.  Testing done for CASSANDRA-5727 indicates that performance improves up to 160MB",
                                 configuredMaxSSTableSize, cfs.name, cfs.getColumnFamilyName());
                 }
@@ -207,7 +212,9 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
 
     public int getEstimatedRemainingTasks()
     {
-        return manifest.getEstimatedTasks();
+        int n = manifest.getEstimatedTasks();
+        cfs.compactionStrategyWrapper.compactionLogger.pending(this, n);
+        return n;
     }
 
     public long getMaxSSTableBytes()
@@ -414,6 +421,26 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
             }
         }
         return null;
+    }
+
+    public CompactionLogger.Strategy strategyLogger()
+    {
+        return new CompactionLogger.Strategy()
+        {
+            public JsonNode sstable(SSTableReader sstable)
+            {
+                ObjectNode node = JsonNodeFactory.instance.objectNode();
+                node.put("level", sstable.getSSTableLevel());
+                node.put("min_token", sstable.first.getToken().toString());
+                node.put("max_token", sstable.last.getToken().toString());
+                return node;
+            }
+
+            public JsonNode options()
+            {
+                return null;
+            }
+        };
     }
 
     public static Map<String, String> validateOptions(Map<String, String> options) throws ConfigurationException

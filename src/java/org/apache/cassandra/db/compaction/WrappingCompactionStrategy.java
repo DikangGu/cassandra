@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
+import org.apache.cassandra.db.Directories;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
@@ -47,6 +48,7 @@ import org.apache.cassandra.notifications.SSTableRepairStatusChanged;
 public final class WrappingCompactionStrategy extends AbstractCompactionStrategy implements INotificationConsumer
 {
     private static final Logger logger = LoggerFactory.getLogger(WrappingCompactionStrategy.class);
+    public final CompactionLogger compactionLogger;
     private volatile AbstractCompactionStrategy repaired;
     private volatile AbstractCompactionStrategy unrepaired;
     /*
@@ -62,6 +64,7 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
     public WrappingCompactionStrategy(ColumnFamilyStore cfs)
     {
         super(cfs, cfs.metadata.compactionStrategyOptions);
+        this.compactionLogger = new CompactionLogger(cfs, this);
         reloadCompactionStrategy(cfs.metadata);
         cfs.getTracker().subscribe(this);
         logger.trace("{} subscribed to the data tracker.", this);
@@ -243,6 +246,11 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
         return repaired.getName();
     }
 
+    public List<AbstractCompactionStrategy> getStrategies()
+    {
+        return Arrays.asList(repaired, unrepaired);
+    }
+
     @Override
     public void replaceSSTables(Collection<SSTableReader> removed, Collection<SSTableReader> added)
     {
@@ -362,6 +370,25 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
         }
         repaired.startup();
         unrepaired.startup();
+
+        if (repaired.logAll || unrepaired.logAll) {
+            compactionLogger.enable();
+        }
+    }
+
+    /**
+     * return the compaction strategy for the given sstable
+     *
+     * returns differently based on the repaired status and which vnode the compaction strategy belongs to
+     * @param sstable
+     * @return
+     */
+    public AbstractCompactionStrategy getCompactionStrategyFor(SSTableReader sstable)
+    {
+        if (sstable.isRepaired())
+            return repaired;
+        else
+            return unrepaired;
     }
 
     @Override
@@ -370,6 +397,7 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
         super.shutdown();
         repaired.shutdown();
         unrepaired.shutdown();
+        compactionLogger.disable();
     }
 
     @Override
@@ -443,5 +471,21 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
         repaired = CFMetaData.createCompactionStrategyInstance(compactionStrategyClass, cfs, options);
         unrepaired = CFMetaData.createCompactionStrategyInstance(compactionStrategyClass, cfs, options);
         this.options = ImmutableMap.copyOf(options);
+    }
+
+    public boolean isRepaired(AbstractCompactionStrategy strategy)
+    {
+        return repaired == strategy;
+    }
+
+    public List<String> getStrategyFolders(AbstractCompactionStrategy strategy)
+    {
+        Directories.DataDirectory[] locations = cfs.getDirectories().getWriteableLocations();
+        List<String> folders = new ArrayList<>(locations.length);
+        for (Directories.DataDirectory location : locations)
+        {
+            folders.add(location.location.getAbsolutePath());
+        }
+        return folders;
     }
 }

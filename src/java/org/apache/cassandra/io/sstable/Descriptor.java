@@ -45,7 +45,6 @@ import static org.apache.cassandra.io.sstable.Component.separator;
  */
 public class Descriptor
 {
-
     public static enum Type
     {
         TEMP("tmp", true), TEMPLINK("tmplink", true), FINAL(null, false);

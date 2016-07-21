@@ -360,6 +360,7 @@ public class Memtable implements Comparable<Memtable>
             assert sstableDirectory != null : "Flush task is not bound to any disk";
             SSTableReader sstable = writeSortedContents(context, sstableDirectory);
             cfs.replaceFlushed(Memtable.this, sstable);
+            cfs.compactionStrategyWrapper.compactionLogger.flush(sstable);
         }
 
         protected Directories getDirectories()

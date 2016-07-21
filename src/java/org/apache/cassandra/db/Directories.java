@@ -359,6 +359,26 @@ public class Directories
         return pickWriteableDirectory(candidates);
     }
 
+    public DataDirectory[] getWriteableLocations()
+    {
+        List<DataDirectory> nonBlacklistedDirs = new ArrayList<>();
+        for (DataDirectory dir : dataDirectories)
+        {
+            if (!BlacklistedDirectories.isUnwritable(dir.location))
+                nonBlacklistedDirs.add(dir);
+        }
+
+        Collections.sort(nonBlacklistedDirs, new Comparator<DataDirectory>()
+        {
+            @Override
+            public int compare(DataDirectory o1, DataDirectory o2)
+            {
+                return o1.location.compareTo(o2.location);
+            }
+        });
+        return nonBlacklistedDirs.toArray(new DataDirectory[nonBlacklistedDirs.size()]);
+    }
+
     // separated for unit testing
     static DataDirectory pickWriteableDirectory(List<DataDirectoryCandidate> candidates)
     {
@@ -854,7 +874,7 @@ public class Directories
         for (int i = 0; i < locations.length; ++i)
             dataDirectories[i] = new DataDirectory(new File(locations[i]));
     }
-    
+
     private class TrueFilesSizeVisitor extends SimpleFileVisitor<Path>
     {
         private final AtomicLong size = new AtomicLong(0);
@@ -893,11 +913,11 @@ public class Directories
         }
 
         @Override
-        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException 
+        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException
         {
             return FileVisitResult.CONTINUE;
         }
-        
+
         public long getAllocatedSize()
         {
             return size.get();

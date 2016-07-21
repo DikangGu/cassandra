@@ -221,11 +221,6 @@ public class CompactionsCQLTest extends CQLTester
         return found;
     }
 
-    private ColumnFamilyStore getCurrentColumnFamilyStore()
-    {
-        return Keyspace.open(KEYSPACE).getColumnFamilyStore(currentTable());
-    }
-
     private boolean minorWasTriggered(String keyspace, String cf) throws Throwable
     {
         UntypedResultSet res = execute("SELECT * FROM system.compaction_history");

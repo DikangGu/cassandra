@@ -104,6 +104,14 @@ public class View
         return concat(flushingMemtables, liveMemtables);
     }
 
+    /**
+     * shortcut for all live sstables, so can efficiently use it for size, etc
+     */
+    public Set<SSTableReader> liveSSTables()
+    {
+        return sstables;
+    }
+
     public Sets.SetView<SSTableReader> nonCompactingSStables()
     {
         return Sets.difference(sstables, compacting);

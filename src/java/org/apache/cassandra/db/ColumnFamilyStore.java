@@ -174,7 +174,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     /* These are locally held copies to be changed from the config during runtime */
     private volatile DefaultInteger minCompactionThreshold;
     private volatile DefaultInteger maxCompactionThreshold;
-    private final WrappingCompactionStrategy compactionStrategyWrapper;
+    public final WrappingCompactionStrategy compactionStrategyWrapper;
 
     public final Directories directories;
 
@@ -450,6 +450,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             latencyCalculator = ScheduledExecutors.optionalTasks.schedule(Runnables.doNothing(), 0, TimeUnit.NANOSECONDS);
             mbeanName = null;
         }
+    }
+
+    public Directories getDirectories()
+    {
+        return directories;
     }
 
     /** call when dropping or renaming a CF. Performs mbean housekeeping and invalidates CFS to other operations */
@@ -1594,6 +1599,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     public Tracker getTracker()
     {
         return data;
+    }
+
+    public Set<SSTableReader> getLiveSSTables()
+    {
+        return data.getView().liveSSTables();
     }
 
     public Collection<SSTableReader> getSSTables()
