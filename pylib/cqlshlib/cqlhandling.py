@@ -39,6 +39,11 @@ class CqlParsingRuleSet(pylexotron.ParsingRuleSet):
         'TimeWindowCompactionStrategy'
     )
 
+    available_compaction_filter_classes = (
+        'NoOpCompactionFilter',
+        'CounterExpirationCompactionFilter'
+    )
+
     replication_strategies = (
         'SimpleStrategy',
         'OldNetworkTopologyStrategy',

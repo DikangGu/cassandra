@@ -95,6 +95,8 @@ public class LegacySchemaTables
                 + "comment text,"
                 + "compaction_strategy_class text,"
                 + "compaction_strategy_options text,"
+                + "compaction_filter_class text,"
+                + "compaction_filter_options text,"
                 + "comparator text,"
                 + "compression_parameters text,"
                 + "default_time_to_live int,"
@@ -876,6 +878,8 @@ public class LegacySchemaTables
         adder.add("comment", table.getComment());
         adder.add("compaction_strategy_class", table.compactionStrategyClass.getName());
         adder.add("compaction_strategy_options", json(table.compactionStrategyOptions));
+        adder.add("compaction_filter_class",  table.compactionFilterClass.getName());
+        adder.add("compaction_filter_options", json(table.compactionFilterOptions));
         adder.add("compression_parameters", json(table.compressionParameters.asThriftOptions()));
         adder.add("default_time_to_live", table.getDefaultTimeToLive());
         adder.add("default_validator", table.getDefaultValidator().toString());
@@ -1094,6 +1098,12 @@ public class LegacySchemaTables
         cfm.compactionStrategyClass(CFMetaData.createCompactionStrategy(result.getString("compaction_strategy_class")));
         cfm.compressionParameters(CompressionParameters.create(fromJsonMap(result.getString("compression_parameters"))));
         cfm.compactionStrategyOptions(fromJsonMap(result.getString("compaction_strategy_options")));
+
+        if (result.has("compaction_filter_class"))
+            cfm.compactionFilterClass(CFMetaData.createCompactionFilter(result.getString("compaction_filter_class")));
+
+        if (result.has("compaction_filter_options"))
+            cfm.compactionFilterOptions(fromJsonMap(result.getString("compaction_filter_options")));
 
         if (result.has("min_index_interval"))
             cfm.minIndexInterval(result.getInt("min_index_interval"));

@@ -75,6 +75,7 @@ public final class CFMetaData
     public final static SpeculativeRetry DEFAULT_SPECULATIVE_RETRY = new SpeculativeRetry(SpeculativeRetry.RetryType.PERCENTILE, 0.99);
     public final static int DEFAULT_MIN_INDEX_INTERVAL = 128;
     public final static int DEFAULT_MAX_INDEX_INTERVAL = 2048;
+    public final static Class<? extends AbstractCompactionFilter> DEFAULT_COMPACTION_FILTER_CLASS = NoOpCompactionFilter.class;
 
     // Note that this is the default only for user created tables
     public final static String DEFAULT_COMPRESSOR = LZ4Compressor.class.getCanonicalName();
@@ -219,6 +220,9 @@ public final class CFMetaData
     public volatile Class<? extends AbstractCompactionStrategy> compactionStrategyClass = DEFAULT_COMPACTION_STRATEGY_CLASS;
     public volatile Map<String, String> compactionStrategyOptions = new HashMap<>();
 
+    public volatile Class<? extends AbstractCompactionFilter> compactionFilterClass = DEFAULT_COMPACTION_FILTER_CLASS;
+    public volatile Map<String, String> compactionFilterOptions = new HashMap<>();
+
     public volatile CompressionParameters compressionParameters = new CompressionParameters(null);
     public volatile boolean isOffline = false;
 
@@ -233,6 +237,8 @@ public final class CFMetaData
     public CFMetaData maxCompactionThreshold(int prop) {maxCompactionThreshold = prop; return this;}
     public CFMetaData compactionStrategyClass(Class<? extends AbstractCompactionStrategy> prop) {compactionStrategyClass = prop; return this;}
     public CFMetaData compactionStrategyOptions(Map<String, String> prop) {compactionStrategyOptions = prop; return this;}
+    public CFMetaData compactionFilterClass(Class<? extends AbstractCompactionFilter> prop) {compactionFilterClass = prop; return this;}
+    public CFMetaData compactionFilterOptions(Map<String, String> prop) {compactionFilterOptions = prop; return this;}
     public CFMetaData compressionParameters(CompressionParameters prop) {compressionParameters = prop; return this;}
     public CFMetaData bloomFilterFpChance(double prop) {bloomFilterFpChance = prop; return this;}
     public CFMetaData caching(CachingOptions prop) {caching = prop; return this;}
@@ -357,6 +363,8 @@ public final class CFMetaData
                              .speculativeRetry(parent.speculativeRetry)
                              .compactionStrategyClass(parent.compactionStrategyClass)
                              .compactionStrategyOptions(parent.compactionStrategyOptions)
+                             .compactionFilterClass(parent.compactionFilterClass)
+                             .compactionFilterOptions(parent.compactionFilterOptions)
                              .reloadSecondaryIndexMetadata(parent)
                              .rebuild();
     }
@@ -367,6 +375,8 @@ public final class CFMetaData
         maxCompactionThreshold(parent.maxCompactionThreshold);
         compactionStrategyClass(parent.compactionStrategyClass);
         compactionStrategyOptions(parent.compactionStrategyOptions);
+        compactionFilterClass(parent.compactionFilterClass);
+        compactionFilterOptions(parent.compactionFilterOptions);
         compressionParameters(parent.compressionParameters);
         return this;
     }
@@ -405,6 +415,8 @@ public final class CFMetaData
                       .maxCompactionThreshold(oldCFMD.maxCompactionThreshold)
                       .compactionStrategyClass(oldCFMD.compactionStrategyClass)
                       .compactionStrategyOptions(new HashMap<>(oldCFMD.compactionStrategyOptions))
+                      .compactionFilterClass(oldCFMD.compactionFilterClass)
+                      .compactionFilterOptions(new HashMap<>(oldCFMD.compactionFilterOptions))
                       .compressionParameters(oldCFMD.compressionParameters.copy())
                       .bloomFilterFpChance(oldCFMD.getBloomFilterFpChance())
                       .caching(oldCFMD.caching)
@@ -675,6 +687,8 @@ public final class CFMetaData
             && Objects.equal(columnMetadata, other.columnMetadata)
             && Objects.equal(compactionStrategyClass, other.compactionStrategyClass)
             && Objects.equal(compactionStrategyOptions, other.compactionStrategyOptions)
+            && Objects.equal(compactionFilterClass, other.compactionFilterClass)
+            && Objects.equal(compactionFilterOptions, other.compactionFilterOptions)
             && Objects.equal(compressionParameters, other.compressionParameters)
             && Objects.equal(getBloomFilterFpChance(), other.getBloomFilterFpChance())
             && Objects.equal(memtableFlushPeriod, other.memtableFlushPeriod)
@@ -708,6 +722,8 @@ public final class CFMetaData
             .append(columnMetadata)
             .append(compactionStrategyClass)
             .append(compactionStrategyOptions)
+            .append(compactionFilterClass)
+            .append(compactionFilterOptions)
             .append(compressionParameters)
             .append(getBloomFilterFpChance())
             .append(memtableFlushPeriod)
@@ -795,6 +811,9 @@ public final class CFMetaData
 
         compactionStrategyClass = cfm.compactionStrategyClass;
         compactionStrategyOptions = cfm.compactionStrategyOptions;
+
+        compactionFilterClass = cfm.compactionFilterClass;
+        compactionFilterOptions = cfm.compactionFilterOptions;
 
         compressionParameters = cfm.compressionParameters;
 
@@ -893,6 +912,33 @@ public final class CFMetaData
     public AbstractCompactionStrategy createCompactionStrategyInstance(ColumnFamilyStore cfs)
     {
         return createCompactionStrategyInstance(compactionStrategyClass, cfs, compactionStrategyOptions);
+    }
+
+    public static Class<? extends AbstractCompactionFilter> createCompactionFilter(String className) throws ConfigurationException
+    {
+        className = className.contains(".") ? className : "org.apache.cassandra.db.compaction." + className;
+        Class<AbstractCompactionFilter> filterClass = FBUtilities.classForName(className, "compaction filter");
+        if (!AbstractCompactionFilter.class.isAssignableFrom(filterClass))
+            throw new ConfigurationException(String
+                    .format("Specified compaction filter class (%s) is not derived from CompactionFilter", className));
+
+        return filterClass;
+    }
+
+    public static AbstractCompactionFilter createCompactionFilterInstance(Class<? extends AbstractCompactionFilter> compactionFilterClass,
+                                                                          ColumnFamilyStore cfs,
+                                                                          Map<String, String> compactionFilterOptions)
+    {
+        try
+        {
+            Constructor<? extends AbstractCompactionFilter> constructor = 
+                    compactionFilterClass.getConstructor(ColumnFamilyStore.class, Map.class);
+            return constructor.newInstance(cfs, compactionFilterOptions);
+        }
+        catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException | InstantiationException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -1492,6 +1538,8 @@ public final class CFMetaData
             .append("columnMetadata", columnMetadata.values())
             .append("compactionStrategyClass", compactionStrategyClass)
             .append("compactionStrategyOptions", compactionStrategyOptions)
+            .append("compactionFilterClass", compactionFilterClass)
+            .append("compactionFilterOptions", compactionFilterOptions)
             .append("compressionParameters", compressionParameters.asThriftOptions())
             .append("bloomFilterFpChance", getBloomFilterFpChance())
             .append("memtableFlushPeriod", memtableFlushPeriod)

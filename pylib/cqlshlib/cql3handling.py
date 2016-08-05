@@ -62,6 +62,8 @@ class Cql3ParsingRuleSet(CqlParsingRuleSet):
             ('sstable_compression', 'chunk_length_kb', 'crc_check_chance')),
         ('caching', None,
             ('rows_per_partition', 'keys')),
+        ('compaction_filter', 'compaction_filter_options',
+            ('class', 'expiration_seconds')),
     )
 
     obsolete_cf_options = ()
@@ -458,6 +460,8 @@ def cf_prop_val_completer(ctxt, cass):
         return ["{'sstable_compression': '"]
     if this_opt == 'compaction':
         return ["{'class': '"]
+    if this_opt == 'compaction_filter':
+        return ["{'class': '"]
     if this_opt == 'caching':
         return ["{'keys': '"]
     if any(this_opt == opt[0] for opt in CqlRuleSet.obsolete_cf_options):
@@ -466,7 +470,8 @@ def cf_prop_val_completer(ctxt, cass):
                     'dclocal_read_repair_chance'):
         return [Hint('<float_between_0_and_1>')]
     if this_opt in ('min_compaction_threshold', 'max_compaction_threshold',
-                    'gc_grace_seconds', 'min_index_interval', 'max_index_interval'):
+                    'gc_grace_seconds', 'min_index_interval', 'max_index_interval',
+                    'expiration_seconds'):
         return [Hint('<integer>')]
     return [Hint('<option_value>')]
 
@@ -511,7 +516,17 @@ def cf_prop_val_mapkey_completer(ctxt, cass):
             opts.add('min_threshold')
             opts.add('max_threshold')
             opts.add('timestamp_resolution')
-            
+
+        return map(escape_value, opts)
+    if optname == 'compaction_filter':
+        opts = set(subopts)
+        try:
+            csc = pairsseen['class']
+        except KeyError:
+            return ["'class'"]
+        csc = csc.split('.')[-1]
+        if csc == 'CounterExpirationCompactionFilter':
+            opts.add('expiration_seconds')
         return map(escape_value, opts)
     return ()
 
@@ -522,6 +537,10 @@ def cf_prop_val_mapval_completer(ctxt, cass):
     if opt == 'compaction':
         if key == 'class':
             return map(escape_value, CqlRuleSet.available_compaction_classes)
+        return [Hint('<option_value>')]
+    elif opt == 'compaction_filter':
+        if key == 'class':
+            return map(escape_value, CqlRuleSet.available_compaction_filter_classes)
         return [Hint('<option_value>')]
     elif opt == 'compression':
         if key == 'sstable_compression':

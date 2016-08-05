@@ -23,6 +23,7 @@ import org.apache.cassandra.cache.CachingOptions;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.CFMetaData.SpeculativeRetry;
 import org.apache.cassandra.db.compaction.AbstractCompactionStrategy;
+import org.apache.cassandra.db.compaction.AbstractCompactionFilter;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.SyntaxException;
 import org.apache.cassandra.io.compress.CompressionParameters;
@@ -44,11 +45,12 @@ public class CFPropDefs extends PropertyDefinitions
     public static final String KW_MEMTABLE_FLUSH_PERIOD = "memtable_flush_period_in_ms";
 
     public static final String KW_COMPACTION = "compaction";
+    public static final String KW_COMPACTION_FILTER = "compaction_filter";
     public static final String KW_COMPRESSION = "compression";
 
     public static final String KW_ID = "id";
 
-    public static final String COMPACTION_STRATEGY_CLASS_KEY = "class";
+    public static final String COMPACTION_CLASS_KEY = "class";
 
     public static final Set<String> keywords = new HashSet<>();
     public static final Set<String> obsoleteKeywords = new HashSet<>();
@@ -66,6 +68,7 @@ public class CFPropDefs extends PropertyDefinitions
         keywords.add(KW_SPECULATIVE_RETRY);
         keywords.add(KW_BF_FP_CHANCE);
         keywords.add(KW_COMPACTION);
+        keywords.add(KW_COMPACTION_FILTER);
         keywords.add(KW_COMPRESSION);
         keywords.add(KW_MEMTABLE_FLUSH_PERIOD);
         keywords.add(KW_ID);
@@ -76,6 +79,7 @@ public class CFPropDefs extends PropertyDefinitions
     }
 
     private Class<? extends AbstractCompactionStrategy> compactionStrategyClass = null;
+    private Class<? extends AbstractCompactionFilter> compactionFilterClass = null;
 
     public void validate() throws ConfigurationException, SyntaxException
     {
@@ -98,14 +102,25 @@ public class CFPropDefs extends PropertyDefinitions
         Map<String, String> compactionOptions = getCompactionOptions();
         if (!compactionOptions.isEmpty())
         {
-            String strategy = compactionOptions.get(COMPACTION_STRATEGY_CLASS_KEY);
+            String strategy = compactionOptions.get(COMPACTION_CLASS_KEY);
             if (strategy == null)
-                throw new ConfigurationException("Missing sub-option '" + COMPACTION_STRATEGY_CLASS_KEY + "' for the '" + KW_COMPACTION + "' option.");
+                throw new ConfigurationException("Missing sub-option '" + COMPACTION_CLASS_KEY + "' for the '" + KW_COMPACTION + "' option.");
 
             compactionStrategyClass = CFMetaData.createCompactionStrategy(strategy);
-            compactionOptions.remove(COMPACTION_STRATEGY_CLASS_KEY);
+            compactionOptions.remove(COMPACTION_CLASS_KEY);
 
             CFMetaData.validateCompactionOptions(compactionStrategyClass, compactionOptions);
+        }
+
+        Map<String, String> compactionFilterOptions = getCompactionFilterOptions();
+        if (!compactionFilterOptions.isEmpty())
+        {
+            String filter = compactionFilterOptions.get(COMPACTION_CLASS_KEY);
+            if (filter == null)
+                throw new ConfigurationException("Missing sub-option '" + COMPACTION_CLASS_KEY + "' for the '" + KW_COMPACTION_FILTER + "' option.");
+
+            compactionFilterClass = CFMetaData.createCompactionFilter(filter);
+            compactionFilterOptions.remove(COMPACTION_CLASS_KEY);
         }
 
         Map<String, String> compressionOptions = getCompressionOptions();
@@ -149,6 +164,14 @@ public class CFPropDefs extends PropertyDefinitions
         if (compactionOptions == null)
             return Collections.emptyMap();
         return compactionOptions;
+    }
+
+    public Map<String, String> getCompactionFilterOptions() throws SyntaxException
+    {
+        Map<String, String> compactionFilterOptions = getMap(KW_COMPACTION_FILTER);
+        if (compactionFilterOptions == null)
+            return new HashMap<>();
+        return compactionFilterOptions;
     }
 
     public Map<String, String> getCompressionOptions() throws SyntaxException
@@ -209,6 +232,12 @@ public class CFPropDefs extends PropertyDefinitions
         {
             cfm.compactionStrategyClass(compactionStrategyClass);
             cfm.compactionStrategyOptions(new HashMap<>(getCompactionOptions()));
+        }
+
+        if (compactionFilterClass != null)
+        {
+            cfm.compactionFilterClass(compactionFilterClass);
+            cfm.compactionFilterOptions(new HashMap<>(getCompactionFilterOptions()));
         }
 
         cfm.bloomFilterFpChance(getDouble(KW_BF_FP_CHANCE, cfm.getBloomFilterFpChance()));

@@ -74,6 +74,7 @@ import org.apache.cassandra.io.sstable.metadata.MetadataType;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.metrics.ColumnFamilyMetrics;
 import org.apache.cassandra.metrics.ColumnFamilyMetrics.Sampler;
+import org.apache.cassandra.metrics.CompactionFilterMetrics;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamLockfile;
@@ -175,10 +176,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private volatile DefaultInteger minCompactionThreshold;
     private volatile DefaultInteger maxCompactionThreshold;
     public final WrappingCompactionStrategy compactionStrategyWrapper;
+    private volatile AbstractCompactionFilter compactionFilter;
 
     public volatile Directories directories;
 
     public final ColumnFamilyMetrics metric;
+    public final CompactionFilterMetrics compactionFilterMetric;
     public volatile long sampleLatencyNanos;
     private final ScheduledFuture<?> latencyCalculator;
 
@@ -201,6 +204,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                 cfs.maxCompactionThreshold = new DefaultInteger(metadata.getMaxCompactionThreshold());
 
         compactionStrategyWrapper.maybeReloadCompactionStrategy(metadata);
+        maybeReloadCompactionFilter(metadata);
 
         scheduleFlush();
 
@@ -210,6 +214,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         // because the old one still aliases the previous comparator.
         if (data.getView().getCurrentMemtable().initialComparator != metadata.comparator)
             switchMemtable();
+    }
+
+    private synchronized void maybeReloadCompactionFilter(CFMetaData metadata)
+    {
+        if (!metadata.compactionFilterClass.equals(this.compactionFilter.getClass()) ||
+                !metadata.compactionFilterOptions.equals(this.compactionFilter.options))
+            this.compactionFilter = CFMetaData.createCompactionFilterInstance(metadata.compactionFilterClass, this,
+                    metadata.compactionFilterOptions);
     }
 
     void scheduleFlush()
@@ -365,6 +377,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         this.partitioner = partitioner;
         this.indexManager = new SecondaryIndexManager(this);
         this.metric = new ColumnFamilyMetrics(this);
+        this.compactionFilterMetric = new CompactionFilterMetrics(this);
         fileIndexGenerator.set(generation);
         sampleLatencyNanos = DatabaseDescriptor.getReadRpcTimeout() / 2;
 
@@ -389,8 +402,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         else
             this.directories = new Directories(metadata, Directories.dataDirectories);
 
-        // compaction strategy should be created after the CFS has been prepared
+        // compaction strategy and filter should be created after the CFS has been prepared
         this.compactionStrategyWrapper = new WrappingCompactionStrategy(this);
+        this.compactionFilter = CFMetaData.createCompactionFilterInstance(metadata.compactionFilterClass, this, metadata.compactionFilterOptions);
 
         // Since compaction can re-define data dir we need to reinit directories
         this.directories = compactionStrategyWrapper.getDirectories();
@@ -1252,6 +1266,15 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         RowCacheKey cacheKey = new RowCacheKey(metadata.ksAndCFName, key);
         invalidateCachedRow(cacheKey);
+    }
+
+    public void maybeUpdateCounterCache(DecoratedKey key, CellName cellName)
+    {
+        if (!isCounterCacheEnabled())
+            return;
+
+        CounterCacheKey cacheKey = CounterCacheKey.create(metadata.ksAndCFName, key.getKey(), cellName);
+        invalidateCachedCounter(cacheKey);
     }
 
     /**
@@ -2602,6 +2625,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         invalidateCachedRow(new RowCacheKey(metadata.ksAndCFName, key));
     }
 
+    public void invalidateCachedCounter(CounterCacheKey key)
+    {
+        CacheService.instance.counterCache.remove(key);
+    }
+
     public ClockAndCount getCachedCounter(ByteBuffer partitionKey, CellName cellName)
     {
         if (CacheService.instance.counterCache.getCapacity() == 0L) // counter cache disabled.
@@ -2864,6 +2892,11 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     public AbstractCompactionStrategy getCompactionStrategy()
     {
         return compactionStrategyWrapper;
+    }
+
+    public AbstractCompactionFilter getCompactionFilter()
+    {
+        return compactionFilter;
     }
 
     public void setCompactionThresholds(int minThreshold, int maxThreshold)

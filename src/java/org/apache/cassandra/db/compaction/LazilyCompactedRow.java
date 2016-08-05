@@ -24,22 +24,32 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterators;
-
-import org.apache.cassandra.db.*;
+import org.apache.cassandra.db.ArrayBackedSortedColumns;
+import org.apache.cassandra.db.Cell;
+import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.ColumnIndex;
+import org.apache.cassandra.db.CounterCell;
+import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.DeletionTime;
+import org.apache.cassandra.db.OnDiskAtom;
+import org.apache.cassandra.db.RangeTombstone;
+import org.apache.cassandra.db.RowIndexEntry;
 import org.apache.cassandra.db.columniterator.OnDiskAtomIterator;
 import org.apache.cassandra.db.index.SecondaryIndexManager;
-import org.apache.cassandra.io.sstable.format.big.BigTableWriter;
 import org.apache.cassandra.io.sstable.ColumnNameHelper;
 import org.apache.cassandra.io.sstable.ColumnStats;
 import org.apache.cassandra.io.sstable.SSTable;
+import org.apache.cassandra.io.sstable.format.big.BigTableWriter;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.io.util.SequentialWriter;
 import org.apache.cassandra.utils.MergeIterator;
 import org.apache.cassandra.utils.StreamingHistogram;
 import org.apache.cassandra.utils.Throwables;
+
+import com.google.common.base.Predicates;
+import com.google.common.collect.Iterators;
 
 /**
  * LazilyCompactedRow only computes the row bloom filter and column index in memory
@@ -326,6 +336,19 @@ public class LazilyCompactedRow extends AbstractCompactedRow
                 }
 
                 columns++;
+
+                AbstractCompactionFilter compactionFilter = controller.cfs.getCompactionFilter();
+                if (compactionFilter.filter(container, key, reduced))
+                {
+                    indexer.remove(reduced);
+                    if (compactionFilter instanceof CounterExpirationCompactionFilter)
+                    {
+                        controller.cfs.maybeUpdateCounterCache(key, reduced.name()); // invalidate counter cache
+                    }
+                    controller.cfs.maybeUpdateRowCache(key); // invalidate row cache
+                    return null;
+                }
+
                 minTimestampTracker.update(reduced.timestamp());
                 maxTimestampTracker.update(reduced.timestamp());
                 maxDeletionTimeTracker.update(reduced.getLocalDeletionTime());

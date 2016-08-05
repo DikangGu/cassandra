@@ -258,6 +258,10 @@ public class ThriftConversion
                 newCFMD.compactionStrategyClass(CFMetaData.createCompactionStrategy(cf_def.compaction_strategy));
             if (cf_def.isSetCompaction_strategy_options())
                 newCFMD.compactionStrategyOptions(new HashMap<>(cf_def.compaction_strategy_options));
+            if (cf_def.isSetCompaction_filter())
+                newCFMD.compactionFilterClass(CFMetaData.createCompactionFilter(cf_def.compaction_filter));
+            if (cf_def.isSetCompaction_filter_options())
+                newCFMD.compactionFilterOptions(new HashMap<>(cf_def.compaction_filter_options));
             if (cf_def.isSetBloom_filter_fp_chance())
                 newCFMD.bloomFilterFpChance(cf_def.bloom_filter_fp_chance);
             if (cf_def.isSetMemtable_flush_period_in_ms())
@@ -303,6 +307,10 @@ public class ThriftConversion
             cf_def.compaction_strategy = CFMetaData.DEFAULT_COMPACTION_STRATEGY_CLASS.getSimpleName();
         if (cf_def.compaction_strategy_options == null)
             cf_def.compaction_strategy_options = Collections.emptyMap();
+        if (cf_def.compaction_filter == null)
+            cf_def.compaction_filter = CFMetaData.DEFAULT_COMPACTION_FILTER_CLASS.getSimpleName();
+        if (cf_def.compaction_filter_options == null)
+            cf_def.compaction_filter_options = Collections.emptyMap();
         if (!cf_def.isSetCompression_options())
             cf_def.setCompression_options(Collections.singletonMap(CompressionParameters.SSTABLE_COMPRESSION, CFMetaData.DEFAULT_COMPRESSOR));
         if (!cf_def.isSetDefault_time_to_live())
@@ -381,6 +389,8 @@ public class ThriftConversion
         def.setColumn_metadata(columnDefinitionsToThrift(cfm.allColumns()));
         def.setCompaction_strategy(cfm.compactionStrategyClass.getName());
         def.setCompaction_strategy_options(new HashMap<>(cfm.compactionStrategyOptions));
+        def.setCompaction_filter(cfm.compactionFilterClass.getName());
+        def.setCompaction_filter_options(new HashMap<>(cfm.compactionFilterOptions));
         def.setCompression_options(cfm.compressionParameters.asThriftOptions());
         def.setBloom_filter_fp_chance(cfm.getBloomFilterFpChance());
         def.setMin_index_interval(cfm.getMinIndexInterval());
