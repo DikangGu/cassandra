@@ -267,7 +267,11 @@ public class Keyspace
         for (CFMetaData cfm : new ArrayList<>(metadata.cfMetaData().values()))
         {
             logger.trace("Initializing {}.{}", getName(), cfm.cfName);
-            initCf(cfm, loadSSTables);
+            // we want to use the custom initializer for offline column families
+            if (!cfm.isOffline)
+            {
+                initCf(cfm, loadSSTables);
+            }
         }
     }
 
@@ -325,6 +329,30 @@ public class Keyspace
     {
         cfs.forceBlockingFlush();
         cfs.invalidate();
+    }
+
+    /**
+     * Registers a custom cf instance with this keyspace.
+     * This is required for offline tools what use non-standard directories.
+     */
+    public void initCfCustom(ColumnFamilyStore newCfs)
+    {
+        ColumnFamilyStore cfs = columnFamilyStores.get(newCfs.metadata.cfId);
+
+        if (cfs == null)
+        {
+            // CFS being created for the first time, either on server startup or new CF being added.
+            // We don't worry about races here; startup is safe, and adding multiple idential CFs
+            // simultaneously is a "don't do that" scenario.
+            ColumnFamilyStore oldCfs = columnFamilyStores.putIfAbsent(newCfs.metadata.cfId, newCfs);
+            // CFS mbean instantiation will error out before we hit this, but in case that changes...
+            if (oldCfs != null)
+                throw new IllegalStateException("added multiple mappings for cf id " + newCfs.metadata.cfId);
+        }
+        else
+        {
+            throw new IllegalStateException("CFS is already initialized: " + cfs.name);
+        }
     }
 
     /**

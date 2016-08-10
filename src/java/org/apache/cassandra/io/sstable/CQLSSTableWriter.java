@@ -34,8 +34,11 @@ import org.apache.cassandra.cql3.statements.CreateTableStatement;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
 import org.apache.cassandra.cql3.statements.UpdateStatement;
 import org.apache.cassandra.db.ArrayBackedSortedColumns;
+import org.apache.cassandra.db.Directories;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.dht.IPartitioner;
@@ -322,7 +325,7 @@ public class CQLSSTableWriter implements Closeable
          * <p>
          * This is a mandatory option.
          *
-         * @param directory the directory to use, which should exists and be writable.
+         * @param directory the directory to use, which should exist and be writable.
          * @return this builder.
          *
          * @throws IllegalArgumentException if {@code directory} doesn't exist or is not writable.
@@ -506,11 +509,24 @@ public class CQLSSTableWriter implements Closeable
             return this;
         }
 
-        private static <T extends CQLStatement> Pair<T, List<ColumnSpecification>> getStatement(String query, Class<T> klass, String type)
+        public static <T extends CQLStatement> Pair<T, List<ColumnSpecification>> getStatement(String query, Class<T> klass, String type)
+        {
+            return getStatement(query, klass, type, null);
+        }
+
+        /**
+         * We use this function to parse the create statements here and for offline column families and their keyspaces.
+         */
+        public static <T extends CQLStatement> Pair<T, List<ColumnSpecification>> getStatement(String query, Class<T> klass, String type, String ks)
         {
             try
             {
                 ClientState state = ClientState.forInternalCalls();
+                if (ks != null)
+                {
+                    state.setKeyspace(ks);
+                }
+
                 ParsedStatement.Prepared prepared = QueryProcessor.getStatement(query, state);
                 CQLStatement stmt = prepared.statement;
                 stmt.validate(state);
@@ -536,14 +552,52 @@ public class CQLSSTableWriter implements Closeable
             if (insert == null)
                 throw new IllegalStateException("No insert statement specified, you should provide an insert statement through using()");
 
-            AbstractSSTableSimpleWriter writer = sorted
-                                               ? new SSTableSimpleWriter(directory, schema, partitioner)
-                                               : new BufferedWriter(directory, schema, partitioner, bufferSizeInMB);
-
+            AbstractSSTableSimpleWriter writer = sorted ? new SSTableSimpleWriter(directory, schema, partitioner)
+                                                        : new BufferedWriter(directory, schema, partitioner, this.bufferSizeInMB);
             if (formatType != null)
                 writer.setSSTableFormatType(formatType);
 
             return new CQLSSTableWriter(writer, insert, boundNames);
+        }
+
+        /**
+         * Creates the table according to schema statement
+         * with specified data directories
+         *
+         * This function assumes that the keyspace for this CFS has been created
+         */
+        public static ColumnFamilyStore createOfflineTable(CFMetaData schema, List<File> directoryList)
+        {
+            schema.makeOffline();
+
+            // The keyspace must exist for us to create this CFS
+            String keyspace = schema.ksName;
+            KSMetaData ksm = Schema.instance.getKSMetaData(keyspace);
+            assert ksm != null;
+
+            // add the provided schema to the keyspace
+            if (Schema.instance.getCFMetaData(schema.ksName, schema.cfName) == null)
+            {
+                addTableToKeyspace(ksm, schema);
+            }
+
+            Keyspace.setInitialized();
+
+            // prepare the directories for the CFS
+            List<Directories.DataDirectory> dds = new ArrayList<>();
+            for (File d : directoryList)
+            {
+                dds.add(new Directories.DataDirectory(d));
+            }
+            Directories directories = new Directories(schema, dds);
+
+            Keyspace ks = Keyspace.openWithoutSSTables(keyspace);
+            IPartitioner partitioner = Murmur3Partitioner.instance;
+            ColumnFamilyStore cfs =  ColumnFamilyStore.createColumnFamilyStore(ks, schema.cfName, partitioner, schema, directories, false, false, true);
+
+            ks.initCfCustom(cfs);
+
+            return cfs;
         }
     }
 

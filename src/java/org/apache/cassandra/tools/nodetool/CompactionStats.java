@@ -46,11 +46,14 @@ public class CompactionStats extends NodeToolCmd
     {
         CompactionManagerMBean cm = probe.getCompactionManagerProxy();
         System.out.println("pending tasks: " + probe.getCompactionMetric("PendingTasks"));
+        reportCompactionTable(cm.getCompactions(), probe.getCompactionThroughput(), humanReadable);
+    }
+
+    public static void reportCompactionTable(List<Map<String,String>> compactions, int compactionThroughput, boolean humanReadable)
+    {
         long remainingBytes = 0;
-        List<Map<String, String>> compactions = cm.getCompactions();
         if (!compactions.isEmpty())
         {
-            int compactionThroughput = probe.getCompactionThroughput();
             List<String[]> lines = new ArrayList<>();
             int[] columnSizes = new int[] { 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -96,7 +99,8 @@ public class CompactionStats extends NodeToolCmd
         }
     }
 
-    private void addLine(List<String[]> lines, int[] columnSizes, String... columns) {
+    private static void addLine(List<String[]> lines, int[] columnSizes, String... columns)
+    {
         lines.add(columns);
         for (int i = 0; i < columns.length; i++) {
             columnSizes[i] = Math.max(columnSizes[i], columns[i].length());

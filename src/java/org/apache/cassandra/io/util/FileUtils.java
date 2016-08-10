@@ -422,7 +422,7 @@ public class FileUtils
                 break;
         }
     }
-    
+
     public static void handleFSError(FSError e)
     {
         if (!StorageService.instance.isSetupCompleted())
@@ -469,20 +469,42 @@ public class FileUtils
                 break;
         }
     }
+
+    /**
+     * When using folderSize on a column family directory
+     * during writing or compaction, there is a race condition in which
+     * a temporary directory may exist. It is possible for this directory
+     * to get deleted after folderSize gets called on the File object for
+     * this path. In this case, directory.listFiles() will return null,
+     * causing a null pointer exception. As a result, we must ask the user
+     * if we should consider ignoring temporary directories. By default, we
+     * don't ignore temporary directories.
+     */
+    public static long folderSize(File directory)
+    {
+        return folderSize(directory, false);
+    }
+
     /**
      * Get the size of a directory in bytes
      * @param directory The directory for which we need size.
      * @return The size of the directory
      */
-    public static long folderSize(File directory)
+    public static long folderSize(File directory, boolean ignoreTempDirectories)
     {
         long length = 0;
+
+        if (ignoreTempDirectories && directory.getName().contains("tmp-"))
+        {
+            return length;
+        }
+
         for (File file : directory.listFiles())
         {
             if (file.isFile())
                 length += file.length();
             else
-                length += folderSize(file);
+                length += folderSize(file, ignoreTempDirectories);
         }
         return length;
     }

@@ -54,6 +54,11 @@ public class CreateKeyspaceStatement extends SchemaAlteringStatement
         return name;
     }
 
+    public KSPropDefs getAttrs()
+    {
+        return attrs;
+    }
+
     public void checkAccess(ClientState state) throws UnauthorizedException
     {
         state.hasAllKeyspacesAccess(Permission.CREATE);

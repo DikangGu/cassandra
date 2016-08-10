@@ -81,14 +81,28 @@ public abstract class Operation
         public int rowCount();
     }
 
-    boolean ready(WorkManager permits, RateLimiter rateLimiter)
+    public int ready(WorkManager permits)
+    {
+        return readyPartition(permits, null);
+    }
+
+    public boolean ready(WorkManager permits, RateLimiter rateLimiter)
+    {
+        return readyPartition(permits, rateLimiter) > 0;
+    }
+
+    /**
+     * Waits for partitions to become ready for use by an operation.
+     * Returns the number of ready partitions.
+     */
+    int readyPartition(WorkManager permits, RateLimiter rateLimiter)
     {
         int partitionCount = (int) spec.partitionCount.next();
         if (partitionCount <= 0)
-            return false;
+            return 0;
         partitionCount = permits.takePermits(partitionCount);
         if (partitionCount <= 0)
-            return false;
+            return 0;
 
         int i = 0;
         boolean success = true;
@@ -113,7 +127,7 @@ public abstract class Operation
             rateLimiter.acquire(partitionCount);
 
         partitions = partitionCache.subList(0, partitionCount);
-        return !partitions.isEmpty();
+        return partitions.size();
     }
 
     protected boolean reset(Seed seed, PartitionIterator iterator)

@@ -352,6 +352,11 @@ public class FBUtilities
         return System.currentTimeMillis() * 1000;
     }
 
+    public static int nowInSeconds()
+    {
+        return (int) (System.currentTimeMillis() / 1000);
+    }
+
     public static <T> List<T> waitOnFutures(Iterable<? extends Future<? extends T>> futures)
     {
         List<T> results = new ArrayList<>();

@@ -28,15 +28,20 @@ import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AlreadyExistsException;
 import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.KSMetaData;
+import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.CreateKeyspaceStatement;
+import org.apache.cassandra.cql3.statements.CreateTableStatement;
 import org.apache.cassandra.exceptions.RequestValidationException;
 import org.apache.cassandra.exceptions.SyntaxException;
 import org.apache.cassandra.stress.generate.*;
@@ -55,11 +60,13 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
+import static org.apache.cassandra.io.sstable.CQLSSTableWriter.Builder.getStatement;
+
 public class StressProfile implements Serializable
 {
     private String keyspaceCql;
     private String tableCql;
-    private String seedStr;
+    public final String seedStr = "seed for stress";
 
     public String keyspaceName;
     public String tableName;
@@ -82,13 +89,14 @@ public class StressProfile implements Serializable
     transient volatile Map<String, PreparedStatement> queryStatements;
     transient volatile Map<String, Integer> thriftQueryIds;
 
+    private static final Pattern lowercaseAlphanumeric = Pattern.compile("[a-z0-9_]+");
+
     private void init(StressYaml yaml) throws RequestValidationException
     {
         keyspaceName = yaml.keyspace;
         keyspaceCql = yaml.keyspace_definition;
         tableName = yaml.table;
         tableCql = yaml.table_definition;
-        seedStr = "seed for stress";
         queries = yaml.queries;
         insert = yaml.insert;
 
@@ -281,6 +289,101 @@ public class StressProfile implements Serializable
                                ThriftConversion.fromThrift(settings.command.consistencyLevel), argSelects.get(name));
     }
 
+    /**
+     * Generates ColumnInfo generators from a list of ColumnDefinitions
+     */
+    private List<Generator> createGenerators(List<ColumnDefinition> colDefs)
+    {
+        List<Generator> generators = new ArrayList<>();
+        for (ColumnDefinition colDef : colDefs)
+        {
+            generators.add(
+              new ColumnInfo(colDef.name.toString(),
+              colDef.type.asCQL3Type().toString(),
+              "",
+              columnConfigs.get(colDef.name.toString()))
+            .getGenerator());
+        }
+        return generators;
+    }
+
+    /**
+     * Creates column generators to perform the offline inserts.
+     */
+    public PartitionGenerator getOfflineGenerator()
+    {
+        CFMetaData cfMetaData = CFMetaData.compile(tableCql, keyspaceName);
+
+        // Add missing column configs
+        Iterator<ColumnDefinition> it = cfMetaData.allColumnsInSelectOrder();
+        while (it.hasNext())
+        {
+            ColumnDefinition c = it.next();
+            if (!columnConfigs.containsKey(c.name.toString()))
+                columnConfigs.put(c.name.toString(), new GeneratorConfig(seedStr + c.name.toString(), null, null, null));
+        }
+
+        List<Generator> partitionColumns = createGenerators(cfMetaData.partitionKeyColumns());
+        List<Generator> clusteringColumns = createGenerators(cfMetaData.clusteringColumns());
+        List<Generator> regularColumns = createGenerators(com.google.common.collect.Lists.newArrayList(cfMetaData.regularAndStaticColumns()));
+
+        return new PartitionGenerator(partitionColumns, clusteringColumns, regularColumns, PartitionGenerator.Order.ARBITRARY);
+    }
+
+    public KSMetaData createKSMetaDataFromStatement()
+    {
+        return getStatement(keyspaceCql, CreateKeyspaceStatement.class, "CREATE KEYSPACE", null).left.getAttrs().asKSMetadata(keyspaceName);
+    }
+
+    public CFMetaData createCFMetaDataFromStatement()
+    {
+        return CFMetaData.compile(tableCql, keyspaceName);
+    }
+
+    /**
+     * Gets schema parameters for the table and the inserting pattern, squashes them as parameters
+     * for the SchemaInsert object and returns and instantiation of that, which is the main object
+     * we will use for offline inserts.
+     */
+    public SchemaInsert getOfflineInsert(Timer timer, PartitionGenerator generator, SeedManager seedManager, StressSettings settings)
+    {
+        assert tableCql != null;
+
+        CFMetaData cfMetaData = CFMetaData.compile(tableCql, keyspaceName);
+
+        List<ColumnDefinition> allColumns = com.google.common.collect.Lists.newArrayList(cfMetaData.allColumnsInSelectOrder());
+
+        // generate the insert statements
+        StringBuilder sb = new StringBuilder();
+        sb.append("INSERT INTO ").append(quoteIdentifier(keyspaceName) + "." + quoteIdentifier(tableName)).append(" (");
+        StringBuilder value = new StringBuilder();
+        for (ColumnDefinition c : allColumns)
+        {
+            sb.append(quoteIdentifier(c.name.toString())).append(", ");
+            value.append("?, ");
+        }
+        sb.delete(sb.lastIndexOf(","), sb.length());
+        value.delete(value.lastIndexOf(","), value.length());
+        sb.append(") ").append("values(").append(value).append(')');
+
+        if (insert == null)
+            insert = new HashMap<>();
+        lowerCase(insert);
+
+        partitions = select(settings.insert.batchsize, "partitions", "fixed(1)", insert, OptionDistribution.BUILDER);
+        selectchance = select(settings.insert.selectRatio, "select", "fixed(1)/1", insert, OptionRatioDistribution.BUILDER);
+
+        if (generator.maxRowCount > 100 * 1000 * 1000)
+            System.err.printf("WARNING: You have defined a schema that permits very large partitions (%.0f max rows (>100M))%n", generator.maxRowCount);
+
+        String statement = sb.toString();
+
+        // CQLTableWriter requires the keyspace name be in the create statement
+        String tableCreate = tableCql.replaceFirst("\\s+\"?"+tableName+"\"?\\s+", " \""+keyspaceName+"\".\""+tableName+"\" ");
+
+        return new SchemaInsert(timer, settings, generator, seedManager, selectchance.get(), thriftInsertId, statement, tableCreate);
+    }
+
     public SchemaInsert getInsert(Timer timer, PartitionGenerator generator, SeedManager seedManager, StressSettings settings)
     {
         if (insertStatement == null)
@@ -458,12 +561,19 @@ public class StressProfile implements Serializable
             Set<ColumnMetadata> keyColumns = com.google.common.collect.Sets.newHashSet(tableMetaData.getPrimaryKey());
 
             for (ColumnMetadata metadata : tableMetaData.getPartitionKey())
-                partitionKeys.add(new ColumnInfo(metadata.getName(), metadata.getType(), columnConfigs.get(metadata.getName())));
+                partitionKeys.add(metadataToInfo(metadata));
             for (ColumnMetadata metadata : tableMetaData.getClusteringColumns())
-                clusteringColumns.add(new ColumnInfo(metadata.getName(), metadata.getType(), columnConfigs.get(metadata.getName())));
+                clusteringColumns.add(metadataToInfo(metadata));
             for (ColumnMetadata metadata : tableMetaData.getColumns())
                 if (!keyColumns.contains(metadata))
-                    valueColumns.add(new ColumnInfo(metadata.getName(), metadata.getType(), columnConfigs.get(metadata.getName())));
+                    valueColumns.add(metadataToInfo(metadata));
+        }
+
+        private ColumnInfo metadataToInfo(ColumnMetadata metadata)
+        {
+            return new ColumnInfo(metadata.getName(), metadata.getType().getName().toString(),
+                                  metadata.getType().isCollection() ? metadata.getType().getTypeArguments().get(0).getName().toString() : "",
+                                  columnConfigs.get(metadata.getName()));
         }
 
         PartitionGenerator newGenerator(StressSettings settings)
@@ -483,66 +593,68 @@ public class StressProfile implements Serializable
     static class ColumnInfo
     {
         final String name;
-        final DataType type;
+        final String type;
+        final String collectionType;
         final GeneratorConfig config;
 
-        ColumnInfo(String name, DataType type, GeneratorConfig config)
+        ColumnInfo(String name, String type, String collectionType, GeneratorConfig config)
         {
             this.name = name;
             this.type = type;
+            this.collectionType = collectionType;
             this.config = config;
         }
 
         Generator getGenerator()
         {
-            return getGenerator(name, type, config);
+            return getGenerator(name, type, collectionType, config);
         }
 
-        static Generator getGenerator(final String name, final DataType type, GeneratorConfig config)
+        static Generator getGenerator(final String name, final String type, final String collectionType, GeneratorConfig config)
         {
-            switch (type.getName())
+            switch (type.toUpperCase())
             {
-                case ASCII:
-                case TEXT:
-                case VARCHAR:
+                case "ASCII":
+                case "TEXT":
+                case "VARCHAR":
                     return new Strings(name, config);
-                case BIGINT:
-                case COUNTER:
+                case "BIGINT":
+                case "COUNTER":
                     return new Longs(name, config);
-                case BLOB:
+                case "BLOB":
                     return new Bytes(name, config);
-                case BOOLEAN:
+                case "BOOLEAN":
                     return new Booleans(name, config);
-                case DECIMAL:
+                case "DECIMAL":
                     return new BigDecimals(name, config);
-                case DOUBLE:
+                case "DOUBLE":
                     return new Doubles(name, config);
-                case FLOAT:
+                case "FLOAT":
                     return new Floats(name, config);
-                case INET:
+                case "INET":
                     return new Inets(name, config);
-                case INT:
+                case "INT":
                     return new Integers(name, config);
-                case VARINT:
+                case "VARINT":
                     return new BigIntegers(name, config);
-                case TIMESTAMP:
+                case "TIMESTAMP":
                     return new Dates(name, config);
-                case UUID:
+                case "UUID":
                     return new UUIDs(name, config);
-                case TIMEUUID:
+                case "TIMEUUID":
                     return new TimeUUIDs(name, config);
-                case TINYINT:
+                case "TINYINT":
                     return new TinyInts(name, config);
-                case SMALLINT:
+                case "SMALLINT":
                     return new SmallInts(name, config);
-                case TIME:
+                case "TIME":
                     return new Times(name, config);
-                case DATE:
+                case "DATE":
                     return new LocalDates(name, config);
-                case SET:
-                    return new Sets(name, getGenerator(name, type.getTypeArguments().get(0), config), config);
-                case LIST:
-                    return new Lists(name, getGenerator(name, type.getTypeArguments().get(0), config), config);
+                case "SET":
+                    return new Sets(name, getGenerator(name, collectionType, null, config), config);
+                case "LIST":
+                    return new Lists(name, getGenerator(name, collectionType, null, config), config);
                 default:
                     throw new UnsupportedOperationException("Because of this name: "+name+" if you removed it from the yaml and are still seeing this, make sure to drop table");
             }
@@ -590,5 +702,11 @@ public class StressProfile implements Serializable
         }
         for (Map.Entry<String, V> e : reinsert)
             map.put(e.getKey().toLowerCase(), e.getValue());
+    }
+
+    /* Quote a identifier if it contains uppercase letters */
+    private static String quoteIdentifier(String identifier)
+    {
+        return lowercaseAlphanumeric.matcher(identifier).matches() ? identifier : '\"'+identifier+ '\"';
     }
 }

@@ -160,7 +160,12 @@ public class KeyCollisionTest
 
         public BigIntegerToken getRandomToken()
         {
-            return new BigIntegerToken(BigInteger.valueOf(new Random().nextInt(15)));
+            return getRandomToken(new Random());
+        }
+
+        public BigIntegerToken getRandomToken(Random random)
+        {
+            return new BigIntegerToken(BigInteger.valueOf(random.nextInt(15)));
         }
 
         private final Token.TokenFactory tokenFactory = new Token.TokenFactory() {

@@ -176,7 +176,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     private volatile DefaultInteger maxCompactionThreshold;
     public final WrappingCompactionStrategy compactionStrategyWrapper;
 
-    public final Directories directories;
+    public volatile Directories directories;
 
     public final ColumnFamilyMetrics metric;
     public volatile long sampleLatencyNanos;
@@ -343,17 +343,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         }
     }
 
-    public ColumnFamilyStore(Keyspace keyspace,
-                             String columnFamilyName,
-                             IPartitioner partitioner,
-                             int generation,
-                             CFMetaData metadata,
-                             Directories directories,
-                             boolean loadSSTables)
-    {
-        this(keyspace, columnFamilyName, partitioner, generation, metadata, directories, loadSSTables, true);
-    }
-
 
     @VisibleForTesting
     public ColumnFamilyStore(Keyspace keyspace,
@@ -363,7 +352,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
                               CFMetaData metadata,
                               Directories directories,
                               boolean loadSSTables,
-                              boolean registerBookkeeping)
+                              boolean registerBookkeeping,
+                              boolean offline)
     {
         assert metadata != null : "null metadata for " + keyspace + ":" + columnFamilyName;
 
@@ -373,7 +363,6 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         this.minCompactionThreshold = new DefaultInteger(metadata.getMinCompactionThreshold());
         this.maxCompactionThreshold = new DefaultInteger(metadata.getMaxCompactionThreshold());
         this.partitioner = partitioner;
-        this.directories = directories;
         this.indexManager = new SecondaryIndexManager(this);
         this.metric = new ColumnFamilyMetrics(this);
         fileIndexGenerator.set(generation);
@@ -391,8 +380,20 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             data.addInitialSSTables(sstables);
         }
 
+        /**
+         * When creating a CFS offline we change the default logic needed by CASSANDRA-8671
+         * and link the passed directories to be picked up by the compaction strategy
+         */
+        if (offline)
+            this.directories = directories;
+        else
+            this.directories = new Directories(metadata, Directories.dataDirectories);
+
         // compaction strategy should be created after the CFS has been prepared
         this.compactionStrategyWrapper = new WrappingCompactionStrategy(this);
+
+        // Since compaction can re-define data dir we need to reinit directories
+        this.directories = compactionStrategyWrapper.getDirectories();
 
         if (maxCompactionThreshold.value() <= 0 || minCompactionThreshold.value() <=0)
         {
@@ -517,13 +518,26 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     }
 
     public static synchronized ColumnFamilyStore createColumnFamilyStore(Keyspace keyspace,
+                                                             String columnFamily,
+                                                             IPartitioner partitioner,
+                                                             CFMetaData metadata,
+                                                             boolean loadSSTables)
+    {
+        Directories directories = new Directories(metadata);
+        return createColumnFamilyStore(keyspace, metadata.cfName, StorageService.getPartitioner(), metadata, directories, loadSSTables, true, false);
+    }
+
+    /** This is only directly used by offline tools */
+    public static synchronized ColumnFamilyStore createColumnFamilyStore(Keyspace keyspace,
                                                                          String columnFamily,
                                                                          IPartitioner partitioner,
                                                                          CFMetaData metadata,
-                                                                         boolean loadSSTables)
+                                                                         Directories directories,
+                                                                         boolean loadSSTables,
+                                                                         boolean registerBookkeeping,
+                                                                         boolean offline)
     {
         // get the max generation number, to prevent generation conflicts
-        Directories directories = new Directories(metadata);
         Directories.SSTableLister lister = directories.sstableLister().includeBackups(true);
         List<Integer> generations = new ArrayList<Integer>();
         for (Map.Entry<Descriptor, Set<Component>> entry : lister.list().entrySet())
@@ -532,12 +546,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             generations.add(desc.generation);
             if (!desc.isCompatible())
                 throw new RuntimeException(String.format("Incompatible SSTable found. Current version %s is unable to read file: %s. Please run upgradesstables.",
-                        desc.getFormat().getLatestVersion(), desc));
+                                                        desc.getFormat().getLatestVersion(), desc));
         }
         Collections.sort(generations);
         int value = (generations.size() > 0) ? (generations.get(generations.size() - 1)) : 0;
 
-        return new ColumnFamilyStore(keyspace, columnFamily, partitioner, value, metadata, directories, loadSSTables);
+        return new ColumnFamilyStore(keyspace, columnFamily, partitioner, value, metadata, directories, loadSSTables, registerBookkeeping, offline);
     }
 
     /**

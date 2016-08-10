@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.Directories;
 import org.apache.cassandra.db.Memtable;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.dht.Range;
@@ -71,6 +72,8 @@ public abstract class AbstractCompactionStrategy
     protected boolean uncheckedTombstoneCompaction;
     protected boolean disableTombstoneCompactions = false;
     protected boolean logAll = true;
+
+    private final Directories directories;
 
     /**
      * pause/resume/getNextBackgroundTask must synchronize.  This guarantees that after pause completes,
@@ -115,6 +118,13 @@ public abstract class AbstractCompactionStrategy
             tombstoneCompactionInterval = DEFAULT_TOMBSTONE_COMPACTION_INTERVAL;
             uncheckedTombstoneCompaction = DEFAULT_UNCHECKED_TOMBSTONE_COMPACTION_OPTION;
         }
+
+        directories = cfs.getDirectories();
+    }
+
+    public Directories getDirectories()
+    {
+        return directories;
     }
 
     /**

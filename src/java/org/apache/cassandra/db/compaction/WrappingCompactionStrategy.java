@@ -239,6 +239,12 @@ public final class WrappingCompactionStrategy extends AbstractCompactionStrategy
         return repaired.shouldDefragment();
     }
 
+    public Directories getDirectories()
+    {
+        assert repaired.getClass().equals(unrepaired.getClass());
+        return repaired.getDirectories();
+    }
+
     @Override
     public String getName()
     {

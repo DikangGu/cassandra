@@ -192,6 +192,7 @@ public final class CFMetaData
     private volatile Map<ColumnIdentifier, Long> droppedColumns = new HashMap<>();
     private volatile Map<String, TriggerDefinition> triggers = new HashMap<>();
     private volatile boolean isPurged = false;
+
     /*
      * All CQL3 columns definition are stored in the columnMetadata map.
      * On top of that, we keep separated collection of each kind of definition, to
@@ -219,6 +220,7 @@ public final class CFMetaData
     public volatile Map<String, String> compactionStrategyOptions = new HashMap<>();
 
     public volatile CompressionParameters compressionParameters = new CompressionParameters(null);
+    public volatile boolean isOffline = false;
 
     // attribute setters that return the modified CFMetaData instance
     public CFMetaData comment(String prop) {comment = Strings.nullToEmpty(prop); return this;}
@@ -1461,6 +1463,15 @@ public final class CFMetaData
         return !staticColumns.isEmpty();
     }
 
+    /**
+     * We set a boolean to indicate offline use so that we know how to initialize
+     * the CFS. We have a custom initializer for offline CFS.
+     */
+    public void makeOffline()
+    {
+        this.isOffline = true;
+    }
+
     @Override
     public String toString()
     {
@@ -1492,6 +1503,7 @@ public final class CFMetaData
             .append("droppedColumns", droppedColumns)
             .append("triggers", triggers.values())
             .append("isDense", isDense)
+            .append("isOffline", isOffline)
             .toString();
     }
 }
