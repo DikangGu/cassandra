@@ -23,7 +23,7 @@ BuildRequires: jpackage-utils
 Conflicts:     cassandra
 
 Requires:      java >= 1.7.0
-#Requires:      jna  >= 4.0.0 
+#Requires:      jna  >= 4.0.0
 Requires:      jpackage-utils
 Requires(pre): user(cassandra)
 Requires(pre): group(cassandra)
@@ -68,13 +68,14 @@ cp -p redhat/%{username} %{buildroot}%{_sysconfdir}/rc.d/init.d/
 cp -p redhat/%{username}.conf %{buildroot}%{_sysconfdir}/security/limits.d/
 cp -p redhat/default %{buildroot}%{_sysconfdir}/default/%{username}
 cp -p lib/*.jar %{buildroot}/usr/share/%{username}/lib
+cp -p tools/lib/*.jar %{buildroot}/usr/share/%{username}/lib
 cp -p pylib/*.py %{buildroot}/usr/share/%{username}/pylib
 cp -p pylib/cqlshlib/*.py %{buildroot}/usr/share/%{username}/pylib/cqlshlib
 cp -p %{SOURCE1} %{buildroot}%{_sysconfdir}/profile.d/
 mv redhat/cassandra.in.sh %{buildroot}/usr/share/%{username}
 rm bin/cassandra.in.sh
 mv bin/cassandra %{buildroot}/usr/sbin
-rm bin/*.bat 
+rm bin/*.bat
 cp -p bin/* %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_localstatedir}/lib/%{username}/commitlog
 mkdir -p %{buildroot}%{_localstatedir}/lib/%{username}/data
