@@ -21,33 +21,34 @@ package org.apache.cassandra.db.compaction;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.base.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.utils.NoSpamLogger;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.JsonNodeFactory;
 import org.codehaus.jackson.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Function;
 
 public class CompactionLogger
 {
@@ -86,6 +87,7 @@ public class CompactionLogger
     {
         /**
          * This is used when we are already trying to write out the start of a
+         *
          * @param statement This should be written out to the medium capturing the logs
          * @param tag       This is an identifier for a strategy; each strategy should have a distinct Object
          */
@@ -113,8 +115,10 @@ public class CompactionLogger
     private final AtomicInteger identifier = new AtomicInteger(0);
     private final Map<AbstractCompactionStrategy, String> compactionStrategyMapping = new ConcurrentHashMap<>();
     private final AtomicBoolean enabled = new AtomicBoolean(false);
-    private StrategySummary startStrategiesWrapper = new StrategySummary() {
-        public JsonNode getSummary() {
+    private StrategySummary startStrategiesWrapper = new StrategySummary()
+    {
+        public JsonNode getSummary()
+        {
             return startStrategies();
         }
     };
@@ -129,7 +133,8 @@ public class CompactionLogger
     {
         ArrayNode node = json.arrayNode();
         List<AbstractCompactionStrategy> strategies = csw.getStrategies();
-        for (AbstractCompactionStrategy strategy : strategies) {
+        for (AbstractCompactionStrategy strategy : strategies)
+        {
             node.add(select.apply(strategy));
         }
         return node;
@@ -138,7 +143,8 @@ public class CompactionLogger
     private ArrayNode sstableMap(Collection<SSTableReader> sstables, CompactionStrategyAndTableFunction csatf)
     {
         ArrayNode node = json.arrayNode();
-        for (SSTableReader sstable : sstables) {
+        for (SSTableReader sstable : sstables)
+        {
             node.add(csatf.apply(csw.getCompactionStrategyFor(sstable), sstable));
         }
         return node;
@@ -147,9 +153,11 @@ public class CompactionLogger
     private String getId(AbstractCompactionStrategy strategy)
     {
         String value = compactionStrategyMapping.get(strategy);
-        if (value == null) {
+        if (value == null)
+        {
             value = String.valueOf(identifier.getAndIncrement());
-            if (value != null) {
+            if (value != null)
+            {
                 compactionStrategyMapping.put(strategy, value);
             }
         }
@@ -216,7 +224,8 @@ public class CompactionLogger
         return node;
     }
 
-    private CompactionStrategyAndTableFunction describeSSTableWrapper = new CompactionStrategyAndTableFunction() {
+    private CompactionStrategyAndTableFunction describeSSTableWrapper = new CompactionStrategyAndTableFunction()
+    {
         public JsonNode apply(AbstractCompactionStrategy strategy, SSTableReader sstable)
         {
             return describeSSTable(strategy, sstable);
@@ -235,7 +244,8 @@ public class CompactionLogger
         ObjectNode node = json.objectNode();
         node.put("type", "enable");
         describeStrategy(node);
-        node.put("strategies", compactionStrategyMap(new Function<AbstractCompactionStrategy, JsonNode>() {
+        node.put("strategies", compactionStrategyMap(new Function<AbstractCompactionStrategy, JsonNode>()
+        {
             public JsonNode apply(AbstractCompactionStrategy strategy)
             {
                 return startStrategy(strategy);
@@ -259,7 +269,8 @@ public class CompactionLogger
             ObjectNode node = json.objectNode();
             node.put("type", "disable");
             describeStrategy(node);
-            node.put("strategies", compactionStrategyMap(new Function<AbstractCompactionStrategy, JsonNode>() {
+            node.put("strategies", compactionStrategyMap(new Function<AbstractCompactionStrategy, JsonNode>()
+            {
                 public JsonNode apply(AbstractCompactionStrategy strategy)
                 {
                     return shutdownStrategy(strategy);
@@ -281,7 +292,8 @@ public class CompactionLogger
         }
     }
 
-    public void compaction(long startTime, Collection<SSTableReader> input, long endTime, Collection<SSTableReader> output)
+    public void compaction(long startTime, Collection<SSTableReader> input, long endTime,
+            Collection<SSTableReader> output)
     {
         if (enabled.get())
         {
@@ -309,6 +321,27 @@ public class CompactionLogger
         }
     }
 
+    public void compactionFilter(AbstractCompactionFilter compactionFilter, DecoratedKey key, Cell cell, boolean isFiltered,
+            Map<String, String> details)
+    {
+        if (enabled.get())
+        {
+            ObjectNode node = json.objectNode();
+            node.put("type", "compaction_filter");
+            describeStrategy(node);
+            node.put("filterType", compactionFilter.getName());
+            node.put("logSamplingPct", compactionFilter.logSamplingPct);
+            node.put("isFiltered", isFiltered);
+            node.put("key", key.toString());
+            node.put("cell", cell.getString(cfs.metadata.comparator));
+            for (String dKey : details.keySet())
+            {
+                node.put(dKey, details.get(dKey));
+            }
+            serializer.write(node, startStrategiesWrapper, this);
+        }
+    }
+
     private static class CompactionLogSerializer implements Writer
     {
         private static final String logDirectory = System.getProperty("cassandra.logdir", ".");
@@ -331,7 +364,8 @@ public class CompactionLogger
                 Files.move(compactionLog, tryPath);
             }
 
-            return new OutputStreamWriter(Files.newOutputStream(compactionLog, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE));
+            return new OutputStreamWriter(
+                    Files.newOutputStream(compactionLog, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE));
         }
 
         private void writeLocal(String toWrite)
@@ -356,8 +390,10 @@ public class CompactionLogger
         {
             final String toWrite = statement.toString() + System.lineSeparator();
             final Object c_tag = tag;
-            loggerService.execute(new Runnable() {
-                public void run() {
+            loggerService.execute(new Runnable()
+            {
+                public void run()
+                {
                     rolled.add(c_tag);
                     writeLocal(toWrite);
                 }
@@ -369,8 +405,10 @@ public class CompactionLogger
             final String toWrite = statement.toString() + System.lineSeparator();
             final StrategySummary c_summary = summary;
             final Object c_tag = tag;
-            loggerService.execute(new Runnable() {
-                public void run() {
+            loggerService.execute(new Runnable()
+            {
+                public void run()
+                {
                     if (!rolled.contains(c_tag))
                     {
                         writeLocal(c_summary.getSummary().toString() + System.lineSeparator());

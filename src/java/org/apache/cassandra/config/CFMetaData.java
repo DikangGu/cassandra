@@ -914,6 +914,37 @@ public final class CFMetaData
         return createCompactionStrategyInstance(compactionStrategyClass, cfs, compactionStrategyOptions);
     }
 
+    public static void validateCompactionFilterOptions(Class<? extends AbstractCompactionFilter> filterClass, Map<String, String> options) throws ConfigurationException
+    {
+        try
+        {
+            if (options == null)
+                return;
+
+            Map<?,?> unknownOptions = (Map) filterClass.getMethod("validateOptions", Map.class).invoke(null, options);
+            if (!unknownOptions.isEmpty())
+                throw new ConfigurationException(String.format("Properties specified %s are not understood by %s", unknownOptions.keySet(), filterClass.getSimpleName()));
+        }
+        catch (NoSuchMethodException e)
+        {
+            logger.warn("Compaction Filter {} does not have a static validateOptions method. Validation ignored", filterClass.getName());
+        }
+        catch (InvocationTargetException e)
+        {
+            if (e.getTargetException() instanceof ConfigurationException)
+                throw (ConfigurationException) e.getTargetException();
+            throw new ConfigurationException("Failed to validate compaction filter options: " + options);
+        }
+        catch (ConfigurationException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
+        {
+            throw new ConfigurationException("Failed to validate compaction filter options: " + options);
+        }
+    }
+
     public static Class<? extends AbstractCompactionFilter> createCompactionFilter(String className) throws ConfigurationException
     {
         className = className.contains(".") ? className : "org.apache.cassandra.db.compaction." + className;

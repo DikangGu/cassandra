@@ -24,6 +24,9 @@ import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.CounterCell;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.exceptions.ConfigurationException;
+
+import com.google.common.collect.Maps;
 
 public class CounterExpirationCompactionFilter extends AbstractCompactionFilter
 {
@@ -46,7 +49,18 @@ public class CounterExpirationCompactionFilter extends AbstractCompactionFilter
     {
         boolean ret = (cell instanceof CounterCell) && isExpired(cell);
         if (ret)
+        {
             cfs.compactionFilterMetric.compactionFilterCellsFiltered.inc();
+            if (shouldLog())
+            {
+                Map<String, String> details = Maps.newHashMap();
+                details.put("cellTimestamp", String.valueOf(cell.timestamp() / 1000));
+                details.put("expirationSec", String.valueOf(this.expirationSeconds));
+                details.put("expirationElapsedSec",
+                        String.valueOf(Math.abs(millisBeforeExpiration(cell, this.expirationSeconds)) / 1000));
+                cfs.compactionStrategyWrapper.compactionLogger.compactionFilter(this, key, cell, ret, details);
+            }
+        }
         return ret;
     }
 
@@ -72,6 +86,32 @@ public class CounterExpirationCompactionFilter extends AbstractCompactionFilter
     public static long millisBeforeExpiration(Cell cell, long expirationSeconds)
     {
         return ((cell.timestamp() / 1000) + (expirationSeconds * 1000)) - System.currentTimeMillis();
+    }
+
+    public static Map<String, String> validateOptions(Map<String, String> options) throws ConfigurationException
+    {
+        Map<String, String> uncheckedOptions = AbstractCompactionFilter.validateOptions(options);
+        String expiration = options.get(EXPIRATION_OPTION);
+        if (expiration != null)
+        {
+            try
+            {
+                long exirationValue = Long.parseLong(expiration);
+                if (exirationValue < 0)
+                {
+                    throw new ConfigurationException(
+                            String.format("%s must be greater than 0, but was %d",
+                                    EXPIRATION_OPTION, exirationValue));
+                }
+            }
+            catch (NumberFormatException e)
+            {
+                throw new ConfigurationException(
+                        String.format("%s is not a parsable float for %s", expiration, EXPIRATION_OPTION), e);
+            }
+        }
+        uncheckedOptions.remove(EXPIRATION_OPTION);
+        return uncheckedOptions;
     }
 
     public long getExpirationSeconds()

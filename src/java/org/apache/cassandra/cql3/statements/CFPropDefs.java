@@ -121,6 +121,8 @@ public class CFPropDefs extends PropertyDefinitions
 
             compactionFilterClass = CFMetaData.createCompactionFilter(filter);
             compactionFilterOptions.remove(COMPACTION_CLASS_KEY);
+
+            CFMetaData.validateCompactionFilterOptions(compactionFilterClass, compactionFilterOptions);
         }
 
         Map<String, String> compressionOptions = getCompressionOptions();

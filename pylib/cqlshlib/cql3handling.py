@@ -63,7 +63,7 @@ class Cql3ParsingRuleSet(CqlParsingRuleSet):
         ('caching', None,
             ('rows_per_partition', 'keys')),
         ('compaction_filter', 'compaction_filter_options',
-            ('class', 'expiration_seconds')),
+            ('class', 'expiration_seconds', 'log_sampling_pct')),
     )
 
     obsolete_cf_options = ()
@@ -471,7 +471,7 @@ def cf_prop_val_completer(ctxt, cass):
         return [Hint('<float_between_0_and_1>')]
     if this_opt in ('min_compaction_threshold', 'max_compaction_threshold',
                     'gc_grace_seconds', 'min_index_interval', 'max_index_interval',
-                    'expiration_seconds'):
+                    'expiration_seconds', 'log_sampling_pct'):
         return [Hint('<integer>')]
     return [Hint('<option_value>')]
 
@@ -527,6 +527,7 @@ def cf_prop_val_mapkey_completer(ctxt, cass):
         csc = csc.split('.')[-1]
         if csc == 'CounterExpirationCompactionFilter':
             opts.add('expiration_seconds')
+            opts.add('log_sampling_pct')
         return map(escape_value, opts)
     return ()
 
