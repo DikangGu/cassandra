@@ -53,6 +53,7 @@ public class BackgroundActivityMonitor
     public static final int SOFTIRQ_INDEX = 6;
 
     private static final int NUM_CPUS = Runtime.getRuntime().availableProcessors();
+    private static final boolean IGNORE_LOAD_SEVERITY = Boolean.getBoolean("cassandra.ignore_load_severity");
     private static final String PROC_STAT_PATH = "/proc/stat";
 
     private final AtomicDouble compaction_severity = new AtomicDouble();
@@ -147,22 +148,30 @@ public class BackgroundActivityMonitor
     {
         public void run()
         {
-            double report = -1;
-            try
-            {
-                report = getIOWait();
-            }
-            catch (IOException e)
-            {
-                // ignore;
-                if (FBUtilities.hasProcFS())
-                    logger.warn("Couldn't read /proc/stats");
-            }
-            if (report == -1d)
-                report = compaction_severity.get();
-
             if (!Gossiper.instance.isEnabled())
                 return;
+
+            double report = -1;
+            if (IGNORE_LOAD_SEVERITY)
+            {
+                report = 0;
+            }
+            else
+            {
+                try
+                {
+                    report = getIOWait();
+                }
+                catch (IOException e)
+                {
+                    // ignore;
+                    if (FBUtilities.hasProcFS())
+                        logger.warn("Couldn't read /proc/stats");
+                }
+                if (report == -1d)
+                    report = compaction_severity.get();
+            }
+
             report += manual_severity.get(); // add manual severity setting.
             VersionedValue updated = StorageService.instance.valueFactory.severity(report);
             Gossiper.instance.addLocalApplicationState(ApplicationState.SEVERITY, updated);
