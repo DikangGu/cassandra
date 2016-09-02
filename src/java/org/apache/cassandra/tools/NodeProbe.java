@@ -673,6 +673,16 @@ public class NodeProbe implements AutoCloseable
         ssProxy.enableAutoCompaction(ks, tableNames);
     }
 
+    public void enableSeverity()
+    {
+        ssProxy.enableSeverity();
+    }
+
+    public void disableSeverity()
+    {
+        ssProxy.disableSeverity();
+    }
+
     public void setIncrementalBackupsEnabled(boolean enabled)
     {
         ssProxy.setIncrementalBackupsEnabled(enabled);

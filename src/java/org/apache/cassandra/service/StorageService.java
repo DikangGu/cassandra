@@ -4842,6 +4842,33 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
     }
 
+    private boolean isUsingDynamicSnitch()
+    {
+       return (DatabaseDescriptor.getEndpointSnitch() instanceof DynamicEndpointSnitch);
+    }
+
+    public void enableSeverity()
+    {
+        if (!isUsingDynamicSnitch())
+        {
+            logger.warn("enableseverity only works for DynamicEndpointSnitch");
+            return;
+        }
+        ((DynamicEndpointSnitch)DatabaseDescriptor.getEndpointSnitch()).enableSeverity();
+        logger.info("Enabled Severity for DynamicEndpointSnitch");
+    }
+
+    public void disableSeverity()
+    {
+        if (!isUsingDynamicSnitch())
+        {
+            logger.warn("disableseverity only works for DynamicEndpointSnitch");
+            return;
+        }
+        ((DynamicEndpointSnitch)DatabaseDescriptor.getEndpointSnitch()).disableSeverity();
+        logger.info("Disabled Severity for DynamicEndpointSnitch");
+    }
+
     /** Returns the name of the cluster */
     public String getClusterName()
     {

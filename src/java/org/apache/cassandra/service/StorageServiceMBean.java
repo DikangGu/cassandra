@@ -635,6 +635,9 @@ public interface StorageServiceMBean extends NotificationEmitter
     void disableAutoCompaction(String ks, String ... tables) throws IOException;
     void enableAutoCompaction(String ks, String ... tables) throws IOException;
 
+    void enableSeverity();
+    void disableSeverity();
+
     public void deliverHints(String host) throws UnknownHostException;
 
     /** Returns the name of the cluster */

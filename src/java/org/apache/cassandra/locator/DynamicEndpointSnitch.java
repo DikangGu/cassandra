@@ -46,14 +46,13 @@ import org.apache.cassandra.utils.FBUtilities;
  */
 public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILatencySubscriber, DynamicEndpointSnitchMBean
 {
-    private static final boolean USE_SEVERITY = !Boolean.getBoolean("cassandra.ignore_dynamic_snitch_severity");
-
     private static final double ALPHA = 0.75; // set to 0.75 to make EDS more biased to towards the newer values
     private static final int WINDOW_SIZE = 100;
 
     private volatile int dynamicUpdateInterval = DatabaseDescriptor.getDynamicUpdateInterval();
     private volatile int dynamicResetInterval = DatabaseDescriptor.getDynamicResetInterval();
     private volatile double dynamicBadnessThreshold = DatabaseDescriptor.getDynamicBadnessThreshold();
+    private volatile boolean useSeverity = !Boolean.getBoolean("cassandra.ignore_dynamic_snitch_severity");
 
     // the score for a merged set of endpoints must be this much worse than the score for separate endpoints to
     // warrant not merging two ranges into a single range
@@ -107,6 +106,16 @@ public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILa
             resetSchedular = ScheduledExecutors.scheduledTasks.scheduleWithFixedDelay(reset, dynamicResetInterval, dynamicResetInterval, TimeUnit.MILLISECONDS);
             registerMBean();
         }
+    }
+
+    public void enableSeverity()
+    {
+        this.useSeverity = true;
+    }
+
+    public void disableSeverity()
+    {
+        this.useSeverity = false;
     }
 
     /**
@@ -330,7 +339,7 @@ public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILa
             double score = entry.getValue().getSnapshot().getMedian() / maxLatency;
             // finally, add the severity without any weighting, since hosts scale this relative to their own load and the size of the task causing the severity.
             // "Severity" is basically a measure of compaction activity (CASSANDRA-3722).
-            if (USE_SEVERITY)
+            if (useSeverity)
                 score += getSeverity(entry.getKey());
             // lowest score (least amount of badness) wins.
             newScores.put(entry.getKey(), score);
