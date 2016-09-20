@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.UnknownColumnFamilyException;
 import org.apache.cassandra.io.FSReadError;
 import org.apache.cassandra.utils.AbstractIterator;
@@ -216,7 +217,13 @@ class HintsReader implements AutoCloseable, Iterable<HintsReader.Page>
         private Hint readHint(int size) throws IOException
         {
             if (rateLimiter != null)
+            {
+                if (rateLimiter.getRate() != DatabaseDescriptor.getHintedHandoffThrottleBytesPerNode())
+                    rateLimiter.setRate(DatabaseDescriptor.getHintedHandoffThrottleBytesPerNode());
+
                 rateLimiter.acquire(size);
+            }
+
             input.limit(size);
 
             Hint hint;
@@ -306,7 +313,11 @@ class HintsReader implements AutoCloseable, Iterable<HintsReader.Page>
         private ByteBuffer readBuffer(int size) throws IOException
         {
             if (rateLimiter != null)
+            {
+                if (rateLimiter.getRate() != DatabaseDescriptor.getHintedHandoffThrottleBytesPerNode())
+                    rateLimiter.setRate(DatabaseDescriptor.getHintedHandoffThrottleBytesPerNode());
                 rateLimiter.acquire(size);
+            }
             input.limit(size);
 
             ByteBuffer buffer = ByteBufferUtil.read(input, size);

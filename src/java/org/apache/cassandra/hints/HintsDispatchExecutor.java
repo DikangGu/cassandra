@@ -194,14 +194,7 @@ final class HintsDispatchExecutor
             this.store = store;
             this.hostId = hostId;
 
-            // rate limit is in bytes per second. Uses Double.MAX_VALUE if disabled (set to 0 in cassandra.yaml).
-            // max rate is scaled by the number of nodes in the cluster (CASSANDRA-5272).
-            // the goal is to bound maximum hints traffic going towards a particular node from the rest of the cluster,
-            // not total outgoing hints traffic from this node - this is why the rate limiter is not shared between
-            // all the dispatch tasks (as there will be at most one dispatch task for a particular host id at a time).
-            int nodesCount = Math.max(1, StorageService.instance.getTokenMetadata().getAllEndpoints().size() - 1);
-            int throttleInKB = DatabaseDescriptor.getHintedHandoffThrottleInKB() / nodesCount;
-            this.rateLimiter = RateLimiter.create(throttleInKB == 0 ? Double.MAX_VALUE : throttleInKB * 1024);
+            this.rateLimiter = RateLimiter.create(DatabaseDescriptor.getHintedHandoffThrottleBytesPerNode());
         }
 
         public void run()

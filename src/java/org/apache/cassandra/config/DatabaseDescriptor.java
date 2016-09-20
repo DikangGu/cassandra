@@ -61,6 +61,7 @@ import org.apache.cassandra.scheduler.IRequestScheduler;
 import org.apache.cassandra.scheduler.NoScheduler;
 import org.apache.cassandra.security.EncryptionContext;
 import org.apache.cassandra.service.CacheService.CacheType;
+import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.thrift.ThriftServer.ThriftServerType;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -1964,6 +1965,18 @@ public class DatabaseDescriptor
     public static int getHintedHandoffThrottleInKB()
     {
         return conf.hinted_handoff_throttle_in_kb;
+    }
+
+    public static double getHintedHandoffThrottleBytesPerNode()
+    {
+        // rate limit is in bytes per second. Uses Double.MAX_VALUE if disabled (set to 0 in cassandra.yaml).
+        // max rate is scaled by the number of nodes in the cluster (CASSANDRA-5272).
+        // the goal is to bound maximum hints traffic going towards a particular node from the rest of the cluster,
+        // not total outgoing hints traffic from this node - this is why the rate limiter is not shared between
+        // all the dispatch tasks (as there will be at most one dispatch task for a particular host id at a time).
+        int nodesCount = Math.max(1, StorageService.instance.getTokenMetadata().getAllEndpoints().size() - 1);
+        int throttleInKB = DatabaseDescriptor.getHintedHandoffThrottleInKB() / nodesCount;
+        return throttleInKB == 0 ? Double.MAX_VALUE : throttleInKB * 1024;
     }
 
     public static int getBatchlogReplayThrottleInKB()
