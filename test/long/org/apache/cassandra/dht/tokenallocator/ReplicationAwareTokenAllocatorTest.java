@@ -563,17 +563,13 @@ public class ReplicationAwareTokenAllocatorTest
     @Test
     public void testNewClusterWithRandomPartitioner()
     {
-        Util.flakyTest(this::flakyTestNewClusterWithRandomPartitioner,
-                       5,
-                       "It tends to fail sometimes due to the random selection of the tokens in the first few nodes.");
+        flakyTestNewClusterWithRandomPartitioner();
     }
 
     @Test
     public void testNewClusterWithMurmur3Partitioner()
     {
-        Util.flakyTest(this::flakyTestNewClusterWithMurmur3Partitioner,
-                       5,
-                       "It tends to fail sometimes due to the random selection of the tokens in the first few nodes.");
+        flakyTestNewClusterWithMurmur3Partitioner();
     }
 
     public void flakyTestNewClusterWithRandomPartitioner()
