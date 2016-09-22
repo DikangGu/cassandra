@@ -60,6 +60,7 @@ import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.metrics.HintedHandoffMetrics;
+import org.apache.cassandra.metrics.HintsServiceMetrics;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.service.StorageProxy;
@@ -475,6 +476,7 @@ public class HintedHandOffManager implements HintedHandOffManagerMBean
                     {
                         rowsReplayed.incrementAndGet();
                         deleteHint(hostIdBytes, hint.name(), hint.timestamp());
+                        HintsServiceMetrics.hintsSucceeded.inc();
                     }
                 };
                 WriteResponseHandler<Mutation> responseHandler = new WriteResponseHandler<>(endpoint, WriteType.SIMPLE, callback);
@@ -492,6 +494,7 @@ public class HintedHandOffManager implements HintedHandOffManagerMBean
                 {
                     logger.info("Failed replaying hints to {}; aborting ({} delivered), error : {}",
                         endpoint, rowsReplayed, e.getMessage());
+                    HintsServiceMetrics.hintsTimedOut.inc();
                     break delivery;
                 }
             }
