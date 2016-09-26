@@ -153,7 +153,8 @@ public class Config
     public Integer column_index_size_in_kb = 64;
     public volatile int batch_size_warn_threshold_in_kb = 5;
     public volatile int batch_size_fail_threshold_in_kb = 50;
-    public Integer concurrent_compactors;
+
+    public volatile Integer concurrent_compactors;
     public volatile Integer compaction_throughput_mb_per_sec = 16;
     public volatile Integer compaction_large_partition_warning_threshold_mb = 100;
 

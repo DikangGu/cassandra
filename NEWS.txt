@@ -15,6 +15,89 @@ using the provided 'sstableupgrade' tool.
 
 
 2.2.5
+=======
+New features
+------------
+   - Runtime modification of concurrent_compactors is now available via nodetool
+   - Support for the assignment operators +=/-= has been added for update queries.
+   - An Index implementation may now provide a task which runs prior to joining
+     the ring. See CASSANDRA-12039
+   - Filtering on partition key columns is now also supported for queries without
+     secondary indexes.
+   - A slow query log has been added: slow queries will be logged at DEBUG level.
+     For more details refer to CASSANDRA-12403 and slow_query_log_timeout_in_ms
+     in cassandra.yaml.
+   - Support for GROUP BY queries has been added.
+   - A new compaction-stress tool has been added to test the throughput of compaction
+     for any cassandra-stress user schema.  see compaction-stress help for how to use.
+   - Compaction can now take into account overlapping tables that don't take part
+     in the compaction to look for deleted or overwritten data in the compacted tables.
+     Then such data is found, it can be safely discarded, which in turn should enable
+     the removal of tombstones over that data.
+
+     The behavior can be engaged in two ways:
+       - as a "nodetool garbagecollect -g CELL/ROW" operation, which applies
+         single-table compaction on all sstables to discard deleted data in one step.
+       - as a "provide_overlapping_tombstones:CELL/ROW/NONE" compaction strategy flag,
+         which uses overlapping tables as a source of deletions/overwrites during all
+         compactions.
+     The argument specifies the granularity at which deleted data is to be found:
+       - If ROW is specified, only whole deleted rows (or sets of rows) will be
+         discarded.
+       - If CELL is specified, any columns whose value is overwritten or deleted
+         will also be discarded.
+       - NONE (default) specifies the old behavior, overlapping tables are not used to
+         decide when to discard data.
+     Which option to use depends on your workload, both ROW and CELL increase the
+     disk load on compaction (especially with the size-tiered compaction strategy),
+     with CELL being more resource-intensive. Both should lead to better read
+     performance if deleting rows (resp. overwriting or deleting cells) is common.
+   - Prepared statements are now persisted in the table prepared_statements in
+     the system keyspace. Upon startup, this table is used to preload all
+     previously prepared statements - i.e. in many cases clients do not need to
+     re-prepare statements against restarted nodes.
+   - cqlsh can now connect to older Cassandra versions by downgrading the native
+     protocol version. Please note that this is currently not part of our release
+     testing and, as a consequence, it is not guaranteed to work in all cases.
+     See CASSANDRA-12150 for more details.
+   - Snapshots that are automatically taken before a table is dropped or truncated
+     will have a "dropped" or "truncated" prefix on their snapshot tag name.
+   - Metrics are exposed for successful and failed authentication attempts.
+     These can be located using the object names org.apache.cassandra.metrics:type=Client,name=AuthSuccess
+     and org.apache.cassandra.metrics:type=Client,name=AuthFailure respectively.
+   - Add support to "unset" JSON fields in prepared statements by specifying DEFAULT UNSET.
+     See CASSANDRA-11424 for details
+   - Allow TTL with null value on insert and update. It will be treated as equivalent to inserting a 0.
+
+Upgrading
+---------
+    - Request timeouts in cassandra.yaml (read_request_timeout_in_ms, etc) now apply to the
+      "full" request time on the coordinator.  Previously, they only covered the time from
+      when the coordinator sent a message to a replica until the time that the replica
+      responded.  Additionally, the previous behavior was to reset the timeout when performing
+      a read repair, making a second read to fix a short read, and when subranges were read
+      as part of a range scan or secondary index query.  In 3.10 and higher, the timeout
+      is no longer reset for these "subqueries".  The entire request must complete within
+      the specified timeout.  As a consequence, your timeouts may need to be adjusted
+      to account for this.  See CASSANDRA-12256 for more details.
+    - Logs written to stdout are now consistent with logs written to files.
+      Time is now local (it was UTC on the console and local in files). Date, thread, file
+      and line info where added to stdout. (see CASSANDRA-12004)
+    - The 'clientutil' jar, which has been somewhat broken on the 3.x branch, is not longer provided.
+      The features provided by that jar are provided by any good java driver and we advise relying on drivers rather on
+      that jar, but if you need that jar for backward compatiblity until you do so, you should use the version provided
+      on previous Cassandra branch, like the 3.0 branch (by design, the functionality provided by that jar are stable
+      accross versions so using the 3.0 jar for a client connecting to 3.x should work without issues).
+    - (Tools development) DatabaseDescriptor no longer implicitly startups components/services like
+      commit log replay. This may break existing 3rd party tools and clients. In order to startup
+      a standalone tool or client application, use the DatabaseDescriptor.toolInitialization() or
+      DatabaseDescriptor.clientInitialization() methods. Tool initialization sets up partitioner,
+      snitch, encryption context. Client initialization just applies the configuration but does not
+      setup anything. Instead of using Config.setClientMode() or Config.isClientMode(), which are
+      deprecated now, use one of the appropiate new methods in DatabaseDescriptor.
+    - Application layer keep-alives were added to the streaming protocol to prevent idle incoming connections from
+      timing out and failing the stream session (CASSANDRA-11839). This effectively deprecates the streaming_socket_timeout_in_ms
+      property in favor of streaming_keep_alive_period_in_secs. See cassandra.yaml for more details about this property.
 =====
 
 Upgrading
