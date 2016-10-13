@@ -1,4 +1,5 @@
 2.2.5
+ * Fix timeout in ReplicationAwareTokenAllocatorTest (CASSANDRA-12784)
  * Tune compaction thread count via nodetool (CASSANDRA-12248)
  * Fix exceptions when enabling gossip on nodes that haven't joined the ring (CASSANDRA-12253)
  * Calculate last compacted key on startup (CASSANDRA-6216)
