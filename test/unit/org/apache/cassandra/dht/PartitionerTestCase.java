@@ -36,6 +36,9 @@ import static org.junit.Assert.fail;
 
 public abstract class PartitionerTestCase
 {
+    private static final double SPLIT_RATIO_MIN = 0.10;
+    private static final double SPLIT_RATIO_MAX = 1 - SPLIT_RATIO_MIN;
+
     protected IPartitioner partitioner;
 
     public abstract void initPartitioner();
@@ -132,7 +135,7 @@ public abstract class PartitionerTestCase
 
     private void assertSplit(Token left, Token right, Random rand, int depth)
     {
-        double ratio = rand.nextDouble();
+        double ratio = SPLIT_RATIO_MIN + (SPLIT_RATIO_MAX - SPLIT_RATIO_MIN) * rand.nextDouble();
         Token newToken = partitioner.split(left, right, ratio);
 
         assert new Range<Token>(left, right).contains(newToken)
