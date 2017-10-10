@@ -41,10 +41,14 @@ import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.db.view.View;
 import org.apache.cassandra.dht.Bounds;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.metrics.StreamingMetrics;
 import org.apache.cassandra.schema.TableId;
+import org.apache.cassandra.streaming.messages.IncomingFileMessage;
+import org.apache.cassandra.streaming.messages.StreamMessage;
 import org.apache.cassandra.utils.CloseableIterator;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.Throwables;
@@ -53,7 +57,7 @@ import org.apache.cassandra.utils.concurrent.Refs;
 /**
  * Task that manages receiving files for the session for certain ColumnFamily.
  */
-public class StreamReceiveTask extends StreamTask
+public class StreamReceiveTask extends AbstractStreamReceiveTask
 {
     private static final Logger logger = LoggerFactory.getLogger(StreamReceiveTask.class);
 
@@ -61,16 +65,8 @@ public class StreamReceiveTask extends StreamTask
 
     private static final int MAX_ROWS_PER_BATCH = Integer.getInteger("cassandra.repair.mutation_repair_rows_per_batch", 100);
 
-    // number of files to receive
-    private final int totalFiles;
-    // total size of files to receive
-    private final long totalSize;
-
     // Transaction tracking new files received
     private final LifecycleTransaction txn;
-
-    // true if task is done (either completed or aborted)
-    private volatile boolean done = false;
 
     //  holds references to SSTables received
     protected Collection<SSTableReader> sstables;
@@ -79,9 +75,7 @@ public class StreamReceiveTask extends StreamTask
 
     public StreamReceiveTask(StreamSession session, TableId tableId, int totalFiles, long totalSize)
     {
-        super(session, tableId);
-        this.totalFiles = totalFiles;
-        this.totalSize = totalSize;
+        super(session, tableId, totalFiles, totalSize);
         // this is an "offline" transaction, as we currently manually expose the sstables once done;
         // this should be revisited at a later date, so that LifecycleTransaction manages all sstable state changes
         this.txn = LifecycleTransaction.offline(OperationType.STREAM);
@@ -126,16 +120,6 @@ public class StreamReceiveTask extends StreamTask
             done = true;
             executor.submit(new OnCompletionRunnable(this));
         }
-    }
-
-    public int getTotalNumberOfFiles()
-    {
-        return totalFiles;
-    }
-
-    public long getTotalSize()
-    {
-        return totalSize;
     }
 
     public synchronized LifecycleTransaction getTransaction()
@@ -216,7 +200,7 @@ public class StreamReceiveTask extends StreamTask
                     // schema was dropped during streaming
                     task.sstables.clear();
                     task.abortTransaction();
-                    task.session.taskCompleted(task);
+                    task.session.receiveTaskCompleted(task);
                     return;
                 }
 
@@ -263,7 +247,7 @@ public class StreamReceiveTask extends StreamTask
                         }
                     }
                 }
-                task.session.taskCompleted(task);
+                task.session.receiveTaskCompleted(task);
             }
             catch (Throwable t)
             {
@@ -298,6 +282,11 @@ public class StreamReceiveTask extends StreamTask
         done = true;
         abortTransaction();
         sstables.clear();
+    }
+
+    public void receive(IncomingFileMessage message)
+    {
+        received(message.sstable);
     }
 
     private synchronized void abortTransaction()

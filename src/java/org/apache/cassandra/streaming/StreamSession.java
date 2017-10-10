@@ -714,7 +714,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         metrics.incomingBytes.inc(headerSize);
         // send back file received message
         messageSender.sendMessage(new ReceivedMessage(message.header.tableId, message.header.sequenceNumber));
-        receivers.get(message.header.tableId).received(message.sstable);
+        receivers.get(message.header.tableId).receive(message);
     }
 
     public void progress(String filename, ProgressInfo.Direction direction, long bytes, long total)
@@ -772,13 +772,13 @@ public class StreamSession implements IEndpointStateChangeSubscriber
         return new SessionInfo(peer, index, connecting, receivingSummaries, transferSummaries, state);
     }
 
-    public synchronized void taskCompleted(StreamReceiveTask completedTask)
+    public synchronized void receiveTaskCompleted(StreamTask completedTask)
     {
         receivers.remove(completedTask.tableId);
         maybeCompleted();
     }
 
-    public synchronized void taskCompleted(StreamTransferTask completedTask)
+    public synchronized void transferTaskCompleted(StreamTask completedTask)
     {
         transfers.remove(completedTask.tableId);
         maybeCompleted();
@@ -883,7 +883,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
             }
             else
             {
-                taskCompleted(task); // there are no files to send
+                transferTaskCompleted(task); // there are no files to send
             }
         }
         maybeCompleted();
