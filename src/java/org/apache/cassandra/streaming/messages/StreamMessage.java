@@ -75,6 +75,7 @@ public abstract class StreamMessage
         PREPARE_SYNACK(8, 5, PrepareSynAckMessage.serializer),
         PREPARE_ACK(9, 5, PrepareAckMessage.serializer),
         STREAM_INIT(10, 5, StreamInitMessage.serializer);
+        ROCKSFILE(11, 0, RocksDBIncomingMessage.serializer, RocksDBOutgoingMessage.SERIALIZER);
 
         public static Type get(byte type)
         {

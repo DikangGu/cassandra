@@ -36,6 +36,8 @@ import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.db.lifecycle.SSTableIntervalTree;
 import org.apache.cassandra.db.lifecycle.SSTableSet;
 import org.apache.cassandra.db.lifecycle.View;
+import org.apache.cassandra.engine.streaming.AbstractStreamReceiveTask;
+import org.apache.cassandra.engine.streaming.AbstractStreamTransferTask;
 import org.apache.cassandra.io.sstable.SSTableMultiWriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.slf4j.Logger;
@@ -158,9 +160,9 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     protected final Set<StreamRequest> requests = Sets.newConcurrentHashSet();
     // streaming tasks are created and managed per ColumnFamily ID
     @VisibleForTesting
-    protected final ConcurrentHashMap<TableId, StreamTransferTask> transfers = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<TableId, AbstractStreamTransferTask> transfers = new ConcurrentHashMap<>();
     // data receivers, filled after receiving prepare message
-    private final Map<TableId, StreamReceiveTask> receivers = new ConcurrentHashMap<>();
+    private final Map<TableId, AbstractStreamReceiveTask> receivers = new ConcurrentHashMap<>();
     private final StreamingMetrics metrics;
 
     final Map<String, Set<Range<Token>>> transferredRangesPerKeyspace = new HashMap<>();
@@ -319,27 +321,32 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     {
         failIfFinished();
         Collection<ColumnFamilyStore> stores = getColumnFamilyStores(keyspace, columnFamilies);
-        if (flushTables)
-            flushSSTables(stores);
 
-        List<Range<Token>> normalizedRanges = Range.normalize(ranges);
-        List<SSTableStreamingSections> sections = getSSTableSectionsForRanges(normalizedRanges, stores, pendingRepair, previewKind);
-        try
-        {
-            addTransferFiles(sections);
-            Set<Range<Token>> toBeUpdated = transferredRangesPerKeyspace.get(keyspace);
-            if (toBeUpdated == null)
-            {
-                toBeUpdated = new HashSet<>();
-            }
-            toBeUpdated.addAll(ranges);
-            transferredRangesPerKeyspace.put(keyspace, toBeUpdated);
-        }
-        finally
-        {
-            for (SSTableStreamingSections release : sections)
-                release.ref.release();
-        }
+        for (ColumnFamilyStore cfs : stores)
+            transfers.put(cfs.metadata.id, cfs.engine.getStreamTransferTask(this, cfs.metadata.id, ranges));
+        return;
+
+//        if (flushTables)
+//            flushSSTables(stores);
+//
+//        List<Range<Token>> normalizedRanges = Range.normalize(ranges);
+//        List<SSTableStreamingSections> sections = getSSTableSectionsForRanges(normalizedRanges, stores, pendingRepair, previewKind);
+//        try
+//        {
+//            addTransferFiles(sections);
+//            Set<Range<Token>> toBeUpdated = transferredRangesPerKeyspace.get(keyspace);
+//            if (toBeUpdated == null)
+//            {
+//                toBeUpdated = new HashSet<>();
+//            }
+//            toBeUpdated.addAll(ranges);
+//            transferredRangesPerKeyspace.put(keyspace, toBeUpdated);
+//        }
+//        finally
+//        {
+//            for (SSTableStreamingSections release : sections)
+//                release.ref.release();
+//        }
     }
 
     private void failIfFinished()
@@ -494,7 +501,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     {
         try
         {
-            receivers.values().forEach(StreamReceiveTask::abort);
+            receivers.values().forEach(AbstractStreamReceiveTask::abort);
             transfers.values().forEach(StreamTransferTask::abort);
         }
         catch (Exception e)
@@ -555,6 +562,9 @@ public class StreamSession implements IEndpointStateChangeSubscriber
                 break;
             case FILE:
                 receive((IncomingFileMessage) message);
+                break;
+            case ROCKSFILE:
+                receive((RocksDBIncomingMessage) message);
                 break;
             case RECEIVED:
                 ReceivedMessage received = (ReceivedMessage) message;
@@ -859,7 +869,11 @@ public class StreamSession implements IEndpointStateChangeSubscriber
     {
         failIfFinished();
         if (summary.files > 0)
-            receivers.put(summary.tableId, new StreamReceiveTask(this, summary.tableId, summary.files, summary.totalSize));
+        {
+            ColumnFamilyStore cfs = ColumnFamilyStore.getIfExists(summary.tableId);
+            receivers.put(summary.tableId, cfs.engine.getStreamReceiveTask(this, summary));
+            //receivers.put(summary.tableId, new StreamReceiveTask(this, summary.tableId, summary.files, summary.totalSize));
+        }
     }
 
     private void startStreamingFiles(boolean notifyPrepared)

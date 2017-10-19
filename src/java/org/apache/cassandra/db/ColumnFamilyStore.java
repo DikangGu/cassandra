@@ -57,6 +57,7 @@ import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.rows.CellPath;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.StartupException;
 import org.apache.cassandra.index.SecondaryIndexManager;
@@ -253,6 +254,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     private volatile boolean compactionSpaceCheck = true;
 
+    public StorageEngine engine;
+
     public static void shutdownPostFlushExecutor() throws InterruptedException
     {
         postFlushExecutor.shutdown();
@@ -409,6 +412,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         this.keyspace = keyspace;
         this.metadata = metadata;
+
+        engine = keyspace.engine;
+        
         name = columnFamilyName;
         minCompactionThreshold = new DefaultValue<>(metadata.get().params.compaction.minCompactionThreshold());
         maxCompactionThreshold = new DefaultValue<>(metadata.get().params.compaction.maxCompactionThreshold());
@@ -511,6 +517,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             mbeanName = null;
             oldMBeanName= null;
         }
+
+        engine.openColumnFamilyStore(this);
     }
 
     public TableMetadata metadata()
@@ -949,10 +957,12 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         synchronized (data)
         {
-            Memtable current = data.getView().getCurrentMemtable();
-            for (ColumnFamilyStore cfs : concatWithIndexes())
-                if (!cfs.data.getView().getCurrentMemtable().isClean())
-                    return switchMemtableIfCurrent(current);
+            engine.forceFlush(this);
+
+//            Memtable current = data.getView().getCurrentMemtable();
+//            for (ColumnFamilyStore cfs : concatWithIndexes())
+//                if (!cfs.data.getView().getCurrentMemtable().isClean())
+//                    return switchMemtableIfCurrent(current);
             return waitForFlushes();
         }
     }
@@ -1521,7 +1531,9 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public CompactionManager.AllSSTableOpStatus forceCleanup(int jobs) throws ExecutionException, InterruptedException
     {
-        return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        //return CompactionManager.instance.performCleanup(ColumnFamilyStore.this, jobs);
+        return engine.cleanUpRanges(ColumnFamilyStore.this) ?
+               CompactionManager.AllSSTableOpStatus.SUCCESSFUL : CompactionManager.AllSSTableOpStatus.ABORTED;
     }
 
     public CompactionManager.AllSSTableOpStatus scrub(boolean disableSnapshot, boolean skipCorrupted, boolean checkData, int jobs) throws ExecutionException, InterruptedException

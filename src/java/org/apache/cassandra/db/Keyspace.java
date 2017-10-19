@@ -38,6 +38,7 @@ import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.lifecycle.SSTableSet;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.view.ViewManager;
+import org.apache.cassandra.engine.StorageEngine;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.index.Index;
 import org.apache.cassandra.index.SecondaryIndexManager;
@@ -68,6 +69,8 @@ public class Keyspace
     private static int TEST_FAIL_MV_LOCKS_COUNT = Integer.getInteger("cassandra.test.fail_mv_locks_count", 0);
 
     public final KeyspaceMetrics metric;
+
+    public final StorageEngine engine;
 
     // It is possible to call Keyspace.open without a running daemon, so it makes sense to ensure
     // proper directories here as well as in CassandraDaemon.
@@ -333,6 +336,9 @@ public class Keyspace
             initCf(Schema.instance.getTableMetadataRef(cfm.id), loadSSTables);
         }
         this.viewManager.reload();
+
+        // TODO: init storage engine
+        engine = null;
     }
 
     private Keyspace(KeyspaceMetadata metadata)
@@ -341,6 +347,9 @@ public class Keyspace
         createReplicationStrategy(metadata);
         this.metric = new KeyspaceMetrics(this);
         this.viewManager = new ViewManager(this);
+
+        // TODO: init storage engine
+        engine = null;
     }
 
     public static Keyspace mockKS(KeyspaceMetadata metadata)
@@ -603,31 +612,34 @@ public class Keyspace
                     logger.error("Attempting to mutate non-existant table {} ({}.{})", upd.metadata().id, upd.metadata().keyspace, upd.metadata().name);
                     continue;
                 }
-                AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
 
-                if (requiresViewUpdate)
-                {
-                    try
-                    {
-                        Tracing.trace("Creating materialized view mutations from base table replica");
-                        viewManager.forTable(upd.metadata().id).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
-                    }
-                    catch (Throwable t)
-                    {
-                        JVMStabilityInspector.inspectThrowable(t);
-                        logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s",
-                                                   upd.metadata().toString()), t);
-                        throw t;
-                    }
-                }
+                engine.apply(cfs, upd, writeCommitLog);
 
-                Tracing.trace("Adding to {} memtable", upd.metadata().name);
-                UpdateTransaction indexTransaction = updateIndexes
-                                                     ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
-                                                     : UpdateTransaction.NO_OP;
-                cfs.apply(upd, indexTransaction, opGroup, commitLogPosition);
-                if (requiresViewUpdate)
-                    baseComplete.set(System.currentTimeMillis());
+//                AtomicLong baseComplete = new AtomicLong(Long.MAX_VALUE);
+//
+//                if (requiresViewUpdate)
+//                {
+//                    try
+//                    {
+//                        Tracing.trace("Creating materialized view mutations from base table replica");
+//                        viewManager.forTable(upd.metadata().id).pushViewReplicaUpdates(upd, writeCommitLog, baseComplete);
+//                    }
+//                    catch (Throwable t)
+//                    {
+//                        JVMStabilityInspector.inspectThrowable(t);
+//                        logger.error(String.format("Unknown exception caught while attempting to update MaterializedView! %s",
+//                                                   upd.metadata().toString()), t);
+//                        throw t;
+//                    }
+//                }
+//
+//                Tracing.trace("Adding to {} memtable", upd.metadata().name);
+//                UpdateTransaction indexTransaction = updateIndexes
+//                                                     ? cfs.indexManager.newUpdateTransaction(upd, opGroup, nowInSec)
+//                                                     : UpdateTransaction.NO_OP;
+//                cfs.apply(upd, indexTransaction, opGroup, commitLogPosition);
+//                if (requiresViewUpdate)
+//                    baseComplete.set(System.currentTimeMillis());
             }
 
             if (future != null) {

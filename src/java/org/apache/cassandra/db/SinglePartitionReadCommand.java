@@ -580,7 +580,8 @@ public class SinglePartitionReadCommand extends ReadCommand
         assert executionController != null && executionController.validForReadOn(cfs);
         Tracing.trace("Executing single-partition query on {}", cfs.name);
 
-        return queryMemtableAndDiskInternal(cfs);
+        //return queryMemtableAndDiskInternal(cfs);
+        return cfs.engine.queryStorage(cfs, this);
     }
 
     @Override
