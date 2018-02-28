@@ -50,47 +50,8 @@ import org.junit.Test;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 
 
-public class ViewSchemaTest extends CQLTester
+public class ViewSchemaTest extends ViewTestBase
 {
-    ProtocolVersion protocolVersion = ProtocolVersion.V4;
-    private final List<String> views = new ArrayList<>();
-
-    @BeforeClass
-    public static void startup()
-    {
-        requireNetwork();
-    }
-    @Before
-    public void begin()
-    {
-        views.clear();
-    }
-
-    @After
-    public void end() throws Throwable
-    {
-        for (String viewName : views)
-            executeNet(protocolVersion, "DROP MATERIALIZED VIEW " + viewName);
-    }
-
-    private void createView(String name, String query) throws Throwable
-    {
-        executeNet(protocolVersion, String.format(query, name));
-        // If exception is thrown, the view will not be added to the list; since it shouldn't have been created, this is
-        // the desired behavior
-        views.add(name);
-    }
-
-    private void updateView(String query, Object... params) throws Throwable
-    {
-        executeNet(protocolVersion, query, params);
-        while (!(((SEPExecutor) StageManager.getStage(Stage.VIEW_MUTATION)).getPendingTasks() == 0
-                 && ((SEPExecutor) StageManager.getStage(Stage.VIEW_MUTATION)).getActiveCount() == 0))
-        {
-            Thread.sleep(1);
-        }
-    }
-
     @Test
     public void testCaseSensitivity() throws Throwable
     {

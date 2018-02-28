@@ -31,39 +31,9 @@ import org.junit.Test;
 
 import com.google.common.base.Objects;
 
-public class ViewComplexTest extends CQLTester
+public class ViewComplexTest extends ViewTestBase
 {
-    ProtocolVersion protocolVersion = ProtocolVersion.V4;
-    private final List<String> views = new ArrayList<>();
-
-    @BeforeClass
-    public static void startup()
-    {
-        requireNetwork();
-    }
-
-    @Before
-    public void begin()
-    {
-        views.clear();
-    }
-
-    @After
-    public void end() throws Throwable
-    {
-        for (String viewName : views)
-            executeNet(protocolVersion, "DROP MATERIALIZED VIEW " + viewName);
-    }
-
-    private void createView(String name, String query) throws Throwable
-    {
-        executeNet(protocolVersion, String.format(query, name));
-        // If exception is thrown, the view will not be added to the list; since it shouldn't have been created, this is
-        // the desired behavior
-        views.add(name);
-    }
-
-    private void updateView(String query, Object... params) throws Throwable
+    protected void updateView(String query, Object... params) throws Throwable
     {
         updateViewWithFlush(query, false, params);
     }

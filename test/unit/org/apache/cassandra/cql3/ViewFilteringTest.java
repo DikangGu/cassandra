@@ -38,11 +38,8 @@ import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.FBUtilities;
 
-public class ViewFilteringTest extends CQLTester
+public class ViewFilteringTest extends ViewTestBase
 {
-    ProtocolVersion protocolVersion = ProtocolVersion.V4;
-    private final List<String> views = new ArrayList<>();
-
     @BeforeClass
     public static void startup()
     {
@@ -54,43 +51,6 @@ public class ViewFilteringTest extends CQLTester
     public static void TearDown()
     {
         System.setProperty("cassandra.mv.allow_filtering_nonkey_columns_unsafe", "false");
-    }
-
-    @Before
-    public void begin()
-    {
-        views.clear();
-    }
-
-    @After
-    public void end() throws Throwable
-    {
-        for (String viewName : views)
-            executeNet(protocolVersion, "DROP MATERIALIZED VIEW " + viewName);
-    }
-
-    private void createView(String name, String query) throws Throwable
-    {
-        executeNet(protocolVersion, String.format(query, name));
-        // If exception is thrown, the view will not be added to the list; since it shouldn't have been created, this is
-        // the desired behavior
-        views.add(name);
-    }
-
-    private void updateView(String query, Object... params) throws Throwable
-    {
-        executeNet(protocolVersion, query, params);
-        while (!(((SEPExecutor) StageManager.getStage(Stage.VIEW_MUTATION)).getPendingTasks() == 0
-                 && ((SEPExecutor) StageManager.getStage(Stage.VIEW_MUTATION)).getActiveCount() == 0))
-        {
-            Thread.sleep(1);
-        }
-    }
-
-    private void dropView(String name) throws Throwable
-    {
-        executeNet(protocolVersion, "DROP MATERIALIZED VIEW " + name);
-        views.remove(name);
     }
 
     // TODO will revise the non-pk filter condition in MV, see CASSANDRA-11500
@@ -2094,7 +2054,7 @@ public class ViewFilteringTest extends CQLTester
         updateView("UPDATE %s SET c = ? WHERE k = ?", 1, 0);
         assertRows(execute("SELECT c, k, val FROM mv_rctstest"), row(1, 0, 1));
 
-        updateView("TRUNCATE %s");
+        execute("TRUNCATE %s");
 
         updateView("UPDATE %s USING TIMESTAMP 1 SET c = ?, val = ? WHERE k = ?", 0, 0, 0);
         updateView("UPDATE %s USING TIMESTAMP 3 SET c = ? WHERE k = ?", 1, 0);
