@@ -147,7 +147,7 @@ public class TrackerTest
     public void testAddInitialSSTables()
     {
         ColumnFamilyStore cfs = MockSchema.newCFS();
-        Tracker tracker = cfs.getTracker();
+        Tracker tracker = cfs.getStorageHandler().getTracker();
         List<SSTableReader> readers = ImmutableList.of(MockSchema.sstable(0, 17, cfs),
                                                        MockSchema.sstable(1, 121, cfs),
                                                        MockSchema.sstable(2, 9, cfs));
@@ -167,7 +167,7 @@ public class TrackerTest
         boolean backups = DatabaseDescriptor.isIncrementalBackupsEnabled();
         DatabaseDescriptor.setIncrementalBackupsEnabled(false);
         ColumnFamilyStore cfs = MockSchema.newCFS();
-        Tracker tracker = cfs.getTracker();
+        Tracker tracker = cfs.getStorageHandler().getTracker();
         MockListener listener = new MockListener(false);
         tracker.subscribe(listener);
         List<SSTableReader> readers = ImmutableList.of(MockSchema.sstable(0, 17, cfs),
@@ -199,7 +199,7 @@ public class TrackerTest
     private void testDropSSTables(boolean invalidate)
     {
         ColumnFamilyStore cfs = MockSchema.newCFS();
-        Tracker tracker = cfs.getTracker();
+        Tracker tracker = cfs.getStorageHandler().getTracker();
         MockListener listener = new MockListener(false);
         tracker.subscribe(listener);
         final List<SSTableReader> readers = ImmutableList.of(MockSchema.sstable(0, 9, true, cfs),
@@ -265,7 +265,7 @@ public class TrackerTest
         DatabaseDescriptor.setIncrementalBackupsEnabled(false);
         ColumnFamilyStore cfs = MockSchema.newCFS();
         MockListener listener = new MockListener(false);
-        Tracker tracker = cfs.getTracker();
+        Tracker tracker = cfs.getStorageHandler().getTracker();
         tracker.subscribe(listener);
 
         Memtable prev1 = tracker.switchMemtable(true, new Memtable(new AtomicReference<>(CommitLog.instance.getCurrentPosition()), cfs));
@@ -313,7 +313,7 @@ public class TrackerTest
 
         // test invalidated CFS
         cfs = MockSchema.newCFS();
-        tracker = cfs.getTracker();
+        tracker = cfs.getStorageHandler().getTracker();
         listener = new MockListener(false);
         tracker.subscribe(listener);
         prev1 = tracker.switchMemtable(false, new Memtable(new AtomicReference<>(CommitLog.instance.getCurrentPosition()), cfs));

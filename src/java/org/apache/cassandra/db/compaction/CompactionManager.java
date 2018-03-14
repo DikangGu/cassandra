@@ -209,7 +209,7 @@ public class CompactionManager implements CompactionManagerMBean
     public boolean isCompacting(Iterable<ColumnFamilyStore> cfses)
     {
         for (ColumnFamilyStore cfs : cfses)
-            if (!cfs.getTracker().getCompacting().isEmpty())
+            if (!cfs.getStorageHandler().getTracker().getCompacting().isEmpty())
                 return true;
         return false;
     }
@@ -308,7 +308,7 @@ public class CompactionManager implements CompactionManagerMBean
     private AllSSTableOpStatus parallelAllSSTableOperation(final ColumnFamilyStore cfs, final OneSSTableOperation operation, int jobs, OperationType operationType) throws ExecutionException, InterruptedException
     {
         List<LifecycleTransaction> transactions = new ArrayList<>();
-        try (LifecycleTransaction compacting = cfs.markAllCompacting(operationType))
+        try (LifecycleTransaction compacting = cfs.getStorageHandler().markAllCompacting(operationType))
         {
             if (compacting == null)
                 return AllSSTableOpStatus.UNABLE_TO_CANCEL;
@@ -795,7 +795,7 @@ public class CompactionManager implements CompactionManagerMBean
     private static Collection<SSTableReader> sstablesInBounds(ColumnFamilyStore cfs, Collection<Range<Token>> tokenRangeCollection)
     {
         final Set<SSTableReader> sstables = new HashSet<>();
-        Iterable<SSTableReader> liveTables = cfs.getTracker().getView().select(SSTableSet.LIVE);
+        Iterable<SSTableReader> liveTables = cfs.getStorageHandler().getTracker().getView().select(SSTableSet.LIVE);
         SSTableIntervalTree tree = SSTableIntervalTree.build(liveTables);
 
         for (Range<Token> tokenRange : tokenRangeCollection)
@@ -874,7 +874,7 @@ public class CompactionManager implements CompactionManagerMBean
             else
             {
                 CleanupStrategy cleanupStrategy = CleanupStrategy.get(cfs, ranges, FBUtilities.nowInSeconds());
-                try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstable, OperationType.CLEANUP))
+                try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstable, OperationType.CLEANUP))
                 {
                     doCleanupOne(cfs, txn, cleanupStrategy, ranges, hasIndexes);
                 }
@@ -933,7 +933,7 @@ public class CompactionManager implements CompactionManagerMBean
     // This is not efficient, do not use in any critical path
     private SSTableReader lookupSSTable(final ColumnFamilyStore cfs, Descriptor descriptor)
     {
-        for (SSTableReader sstable : cfs.getSSTables(SSTableSet.CANONICAL))
+        for (SSTableReader sstable : cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL))
         {
             if (sstable.descriptor.equals(descriptor))
                 return sstable;
@@ -1270,7 +1270,7 @@ public class CompactionManager implements CompactionManagerMBean
         FileUtils.createDirectory(compactionFileLocation);
 
         return SSTableWriter.create(cfs.metadata,
-                                    cfs.newSSTableDescriptor(compactionFileLocation),
+                                    cfs.getStorageHandler().newSSTableDescriptor(compactionFileLocation),
                                     expectedBloomFilterSize,
                                     repairedAt,
                                     pendingRepair,
@@ -1304,7 +1304,7 @@ public class CompactionManager implements CompactionManagerMBean
                 break;
             }
         }
-        return SSTableWriter.create(cfs.newSSTableDescriptor(compactionFileLocation),
+        return SSTableWriter.create(cfs.getStorageHandler().newSSTableDescriptor(compactionFileLocation),
                                     (long) expectedBloomFilterSize,
                                     repairedAt,
                                     pendingRepair,
@@ -1348,7 +1348,7 @@ public class CompactionManager implements CompactionManagerMBean
                 // If there is a snapshot created for the session then read from there.
                 // note that we populate the parent repair session when creating the snapshot, meaning the sstables in the snapshot are the ones we
                 // are supposed to validate.
-                sstables = cfs.getSnapshotSSTableReaders(snapshotName);
+                sstables = cfs.getStorageHandler().getSnapshotSSTableReaders(snapshotName);
             }
             else
             {
@@ -1480,7 +1480,7 @@ public class CompactionManager implements CompactionManagerMBean
             predicate = (s) -> !prs.isIncremental || !s.isRepaired();
         }
 
-        try (ColumnFamilyStore.RefViewFragment sstableCandidates = cfs.selectAndReference(View.select(SSTableSet.CANONICAL, predicate)))
+        try (ColumnFamilyStore.RefViewFragment sstableCandidates = cfs.getStorageHandler().selectAndReference(View.select(SSTableSet.CANONICAL, predicate)))
         {
             for (SSTableReader sstable : sstableCandidates.sstables)
             {

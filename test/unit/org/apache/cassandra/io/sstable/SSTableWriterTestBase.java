@@ -155,7 +155,7 @@ public class SSTableWriterTestBase extends SchemaLoader
         }
         assertEquals(spaceUsed, cfs.metric.liveDiskSpaceUsed.getCount());
         assertEquals(spaceUsed, cfs.metric.totalDiskSpaceUsed.getCount());
-        assertTrue(cfs.getTracker().getCompacting().isEmpty());
+        assertTrue(cfs.getStorageHandler().getTracker().getCompacting().isEmpty());
 
         if(cfs.getLiveSSTables().size() > 0)
             assertFalse(CompactionManager.instance.submitMaximal(cfs, cfs.gcBefore((int) (System.currentTimeMillis() / 1000)), false).isEmpty());
@@ -163,7 +163,7 @@ public class SSTableWriterTestBase extends SchemaLoader
 
     public static SSTableWriter getWriter(ColumnFamilyStore cfs, File directory, LifecycleTransaction txn)
     {
-        Descriptor desc = cfs.newSSTableDescriptor(directory);
+        Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(directory);
         return SSTableWriter.create(desc, 0, 0, null, new SerializationHeader(true, cfs.metadata(), cfs.metadata().regularAndStaticColumns(), EncodingStats.NO_STATS), cfs.indexManager.listIndexes(), txn);
     }
 

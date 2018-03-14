@@ -271,7 +271,7 @@ public class TTLExpiryTest
                 .applyUnsafe();
 
         cfs.forceBlockingFlush();
-        SSTableReader blockingSSTable = cfs.getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader blockingSSTable = cfs.getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         for (int i = 0; i < 10; i++)
         {
             new RowUpdateBuilder(cfs.metadata(), System.currentTimeMillis(), "test")
@@ -281,7 +281,7 @@ public class TTLExpiryTest
                             .applyUnsafe();
             cfs.forceBlockingFlush();
         }
-        Multimap<SSTableReader, SSTableReader> blockers = SSTableExpiredBlockers.checkForExpiredSSTableBlockers(cfs.getSSTables(SSTableSet.LIVE), (int) (System.currentTimeMillis() / 1000) + 100);
+        Multimap<SSTableReader, SSTableReader> blockers = SSTableExpiredBlockers.checkForExpiredSSTableBlockers(cfs.getStorageHandler().getSSTables(SSTableSet.LIVE), (int) (System.currentTimeMillis() / 1000) + 100);
         assertEquals(1, blockers.keySet().size());
         assertTrue(blockers.keySet().contains(blockingSSTable));
         assertEquals(10, blockers.get(blockingSSTable).size());

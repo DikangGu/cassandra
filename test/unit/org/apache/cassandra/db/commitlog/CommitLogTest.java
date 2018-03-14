@@ -827,7 +827,7 @@ public abstract class CommitLogTest
                 .build()
                 .apply();
 
-            Memtable current = cfs.getTracker().getView().getCurrentMemtable();
+            Memtable current = cfs.getStorageHandler().getTracker().getView().getCurrentMemtable();
             if (i == 2)
                 current.makeUnflushable();
 

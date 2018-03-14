@@ -122,7 +122,7 @@ public class AbstractCompactionStrategyTest
         }
 
         // now remove sstables on the tracker, to simulate a concurrent transaction
-        cfs.getTracker().removeUnsafe(cfs.getLiveSSTables());
+        cfs.getStorageHandler().getTracker().removeUnsafe(cfs.getLiveSSTables());
 
         // verify the compaction strategy will return null
         Assert.assertNull(strategy.getNextBackgroundTask(FBUtilities.nowInSeconds()));

@@ -111,9 +111,9 @@ public class SecondaryIndexManagerTest extends CQLTester
         cfs.indexManager.markAllIndexesRemoved();
         assertNotMarkedAsBuilt(indexName);
 
-        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getSSTables(SSTableSet.CANONICAL)))
+        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL)))
         {
-            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getTracker());
+            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getStorageHandler().getTracker());
             assertMarkedAsBuilt(indexName);
         }
     }
@@ -211,9 +211,9 @@ public class SecondaryIndexManagerTest extends CQLTester
             public void run()
             {
                 ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-                try (Refs<SSTableReader> sstables = Refs.ref(cfs.getSSTables(SSTableSet.CANONICAL)))
+                try (Refs<SSTableReader> sstables = Refs.ref(cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL)))
                 {
-                    cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getTracker());
+                    cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getStorageHandler().getTracker());
                 }
                 catch (Throwable ex)
                 {
@@ -282,9 +282,9 @@ public class SecondaryIndexManagerTest extends CQLTester
 
         // try adding sstables and verify they are built but the index is not marked as built because of the pending build:
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getSSTables(SSTableSet.CANONICAL)))
+        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL)))
         {
-            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getTracker());
+            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getStorageHandler().getTracker());
             assertNotMarkedAsBuilt(indexName);
         }
 
@@ -337,9 +337,9 @@ public class SecondaryIndexManagerTest extends CQLTester
         // try adding sstables but make the build fail:
         TestingIndex.shouldFailBuild = true;
         ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
-        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getSSTables(SSTableSet.CANONICAL)))
+        try (Refs<SSTableReader> sstables = Refs.ref(cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL)))
         {
-            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getTracker());
+            cfs.indexManager.handleNotification(new SSTableAddedNotification(sstables, null), cfs.getStorageHandler().getTracker());
             fail("Should have failed!");
         }
         catch (Throwable ex)

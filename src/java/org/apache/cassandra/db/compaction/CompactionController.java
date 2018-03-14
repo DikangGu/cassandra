@@ -139,7 +139,7 @@ public class CompactionController implements AutoCloseable
         if (compacting == null || ignoreOverlaps())
             overlappingSSTables = Refs.tryRef(Collections.<SSTableReader>emptyList());
         else
-            overlappingSSTables = cfs.getAndReferenceOverlappingLiveSSTables(compacting);
+            overlappingSSTables = cfs.getStorageHandler().getAndReferenceOverlappingLiveSSTables(compacting);
         this.overlapIterator = new OverlapIterator<>(buildIntervals(overlappingSSTables));
     }
 
@@ -213,7 +213,7 @@ public class CompactionController implements AutoCloseable
                 minTimestamp = Math.min(minTimestamp, candidate.getMinTimestamp());
         }
 
-        for (Memtable memtable : cfStore.getTracker().getView().getAllMemtables())
+        for (Memtable memtable : cfStore.getStorageHandler().getTracker().getView().getAllMemtables())
             minTimestamp = Math.min(minTimestamp, memtable.getMinTimestamp());
 
         // At this point, minTimestamp denotes the lowest timestamp of any relevant
@@ -270,7 +270,7 @@ public class CompactionController implements AutoCloseable
 
         overlapIterator.update(key);
         Set<SSTableReader> filteredSSTables = overlapIterator.overlaps();
-        Iterable<Memtable> memtables = cfs.getTracker().getView().getAllMemtables();
+        Iterable<Memtable> memtables = cfs.getStorageHandler().getTracker().getView().getAllMemtables();
         long minTimestampSeen = Long.MAX_VALUE;
         boolean hasTimestamp = false;
 

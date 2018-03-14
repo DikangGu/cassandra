@@ -82,7 +82,7 @@ public class SizeTieredCompactionStrategy extends AbstractCompactionStrategy
         int minThreshold = cfs.getMinimumCompactionThreshold();
         int maxThreshold = cfs.getMaximumCompactionThreshold();
 
-        Iterable<SSTableReader> candidates = filterSuspectSSTables(filter(cfs.getUncompactingSSTables(), sstables::contains));
+        Iterable<SSTableReader> candidates = filterSuspectSSTables(filter(cfs.getStorageHandler().getUncompactingSSTables(), sstables::contains));
 
         List<List<SSTableReader>> buckets = getBuckets(createSSTableAndLengthPairs(candidates), sizeTieredOptions.bucketHigh, sizeTieredOptions.bucketLow, sizeTieredOptions.minSSTableSize);
         logger.trace("Compaction buckets are {}", buckets);
@@ -196,7 +196,7 @@ public class SizeTieredCompactionStrategy extends AbstractCompactionStrategy
                 return null;
             }
 
-            LifecycleTransaction transaction = cfs.getTracker().tryModify(hottestBucket, OperationType.COMPACTION);
+            LifecycleTransaction transaction = cfs.getStorageHandler().getTracker().tryModify(hottestBucket, OperationType.COMPACTION);
             if (transaction != null)
                 return new CompactionTask(cfs, transaction, gcBefore);
             previousCandidate = hottestBucket;
@@ -209,7 +209,7 @@ public class SizeTieredCompactionStrategy extends AbstractCompactionStrategy
         Iterable<SSTableReader> filteredSSTables = filterSuspectSSTables(sstables);
         if (Iterables.isEmpty(filteredSSTables))
             return null;
-        LifecycleTransaction txn = cfs.getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
+        LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
         if (txn == null)
             return null;
         if (splitOutput)
@@ -222,7 +222,7 @@ public class SizeTieredCompactionStrategy extends AbstractCompactionStrategy
     {
         assert !sstables.isEmpty(); // checked for by CM.submitUserDefined
 
-        LifecycleTransaction transaction = cfs.getTracker().tryModify(sstables, OperationType.COMPACTION);
+        LifecycleTransaction transaction = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.COMPACTION);
         if (transaction == null)
         {
             logger.trace("Unable to mark {} for compaction; probably a background compaction got to it first.  You can disable background compactions temporarily if this is a problem", sstables);

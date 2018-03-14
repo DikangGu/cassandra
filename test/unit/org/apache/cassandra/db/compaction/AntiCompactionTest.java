@@ -115,7 +115,7 @@ public class AntiCompactionTest
         int repairedKeys = 0;
         int pendingKeys = 0;
         int nonRepairedKeys = 0;
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             if (txn == null)
@@ -152,7 +152,7 @@ public class AntiCompactionTest
             assertFalse(sstable.isMarkedCompacted());
             assertEquals(1, sstable.selfRef().globalCount());
         }
-        assertEquals(0, store.getTracker().getCompacting().size());
+        assertEquals(0, store.getStorageHandler().getTracker().getCompacting().size());
         assertEquals(repairedKeys, repairedAt != UNREPAIRED_SSTABLE ? 4 : 0);
         assertEquals(pendingKeys, pendingRepair != NO_PENDING_REPAIR ? 4 : 0);
         assertEquals(nonRepairedKeys, 6);
@@ -178,11 +178,11 @@ public class AntiCompactionTest
         ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(CF);
         cfs.disableAutoCompaction();
         SSTableReader s = writeFile(cfs, 1000);
-        cfs.addSSTable(s);
+        cfs.getStorageHandler().addSSTable(s);
         Range<Token> range = new Range<Token>(new BytesToken(ByteBufferUtil.bytes(0)), new BytesToken(ByteBufferUtil.bytes(500)));
         Collection<SSTableReader> sstables = cfs.getLiveSSTables();
         UUID parentRepairSession = UUID.randomUUID();
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             CompactionManager.instance.performAnticompaction(cfs, Arrays.asList(range), refs, txn, 12345, NO_PENDING_REPAIR, parentRepairSession);
@@ -201,7 +201,7 @@ public class AntiCompactionTest
     private SSTableReader writeFile(ColumnFamilyStore cfs, int count)
     {
         File dir = cfs.getDirectories().getDirectoryForNewSSTables();
-        Descriptor desc = cfs.newSSTableDescriptor(dir);
+        Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(dir);
 
         try (SSTableTxnWriter writer = SSTableTxnWriter.create(cfs, desc, 0, 0, NO_PENDING_REPAIR, new SerializationHeader(true, cfs.metadata(), cfs.metadata().regularAndStaticColumns(), EncodingStats.NO_STATS)))
         {
@@ -265,7 +265,7 @@ public class AntiCompactionTest
         long repairedAt = 1000;
         UUID parentRepairSession = UUID.randomUUID();
         registerParentRepairSession(parentRepairSession, ranges, repairedAt, null);
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             CompactionManager.instance.performAnticompaction(store, ranges, refs, txn, repairedAt, NO_PENDING_REPAIR, parentRepairSession);
@@ -315,7 +315,7 @@ public class AntiCompactionTest
         UUID parentRepairSession = pendingRepair == null ? UUID.randomUUID() : pendingRepair;
         registerParentRepairSession(parentRepairSession, ranges, repairedAt, pendingRepair);
 
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             CompactionManager.instance.performAnticompaction(store, ranges, refs, txn, repairedAt, pendingRepair, parentRepairSession);
@@ -325,7 +325,7 @@ public class AntiCompactionTest
         assertThat(Iterables.get(store.getLiveSSTables(), 0).isRepaired(), is(repairedAt != UNREPAIRED_SSTABLE));
         assertThat(Iterables.get(store.getLiveSSTables(), 0).isPendingRepair(), is(pendingRepair != NO_PENDING_REPAIR));
         assertThat(Iterables.get(store.getLiveSSTables(), 0).selfRef().globalCount(), is(1));
-        assertThat(store.getTracker().getCompacting().size(), is(0));
+        assertThat(store.getStorageHandler().getTracker().getCompacting().size(), is(0));
     }
 
     @Test
@@ -359,7 +359,7 @@ public class AntiCompactionTest
         UUID parentRepairSession = UUID.randomUUID();
         registerParentRepairSession(parentRepairSession, ranges, UNREPAIRED_SSTABLE, null);
 
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             CompactionManager.instance.performAnticompaction(store, ranges, refs, txn, 1, NO_PENDING_REPAIR, parentRepairSession);
@@ -396,7 +396,7 @@ public class AntiCompactionTest
 
     private static Set<SSTableReader> getUnrepairedSSTables(ColumnFamilyStore cfs)
     {
-        return ImmutableSet.copyOf(cfs.getTracker().getView().sstables(SSTableSet.LIVE, (s) -> !s.isRepaired()));
+        return ImmutableSet.copyOf(cfs.getStorageHandler().getTracker().getView().sstables(SSTableSet.LIVE, (s) -> !s.isRepaired()));
     }
 
     /**
@@ -420,7 +420,7 @@ public class AntiCompactionTest
         List<Range<Token>> ranges = Arrays.asList(range);
 
         UUID missingRepairSession = UUIDGen.getTimeUUID();
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
              Refs<SSTableReader> refs = Refs.ref(sstables))
         {
             Assert.assertFalse(refs.isEmpty());

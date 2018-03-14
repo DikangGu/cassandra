@@ -376,7 +376,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
                 final List<Range<PartitionPosition>> keyRanges = new ArrayList<>(ranges.size());
                 for (Range<Token> range : ranges)
                     keyRanges.add(Range.makeRowRange(range));
-                refs.addAll(cfStore.selectAndReference(view -> {
+                refs.addAll(cfStore.getStorageHandler().selectAndReference(view -> {
                     Set<SSTableReader> sstables = Sets.newHashSet();
                     SSTableIntervalTree intervalTree = SSTableIntervalTree.build(view.select(SSTableSet.CANONICAL));
                     Predicate<SSTableReader> predicate;

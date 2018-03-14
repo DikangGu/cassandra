@@ -152,7 +152,7 @@ public class ScrubTest
         overrideWithGarbage(sstable, ByteBufferUtil.bytes("0"), ByteBufferUtil.bytes("1"));
 
         // with skipCorrupted == false, the scrub is expected to fail
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
              Scrubber scrubber = new Scrubber(cfs, txn, false, true))
         {
             scrubber.scrub();
@@ -162,7 +162,7 @@ public class ScrubTest
 
         // with skipCorrupted == true, the corrupt rows will be skipped
         Scrubber.ScrubResult scrubResult;
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
              Scrubber scrubber = new Scrubber(cfs, txn, true, true))
         {
             scrubResult = scrubber.scrubWithResult();
@@ -210,7 +210,7 @@ public class ScrubTest
         overrideWithGarbage(sstable, ByteBufferUtil.bytes("0"), ByteBufferUtil.bytes("1"));
 
         // with skipCorrupted == false, the scrub is expected to fail
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
              Scrubber scrubber = new Scrubber(cfs, txn, false, true))
         {
             // with skipCorrupted == true, the corrupt row will be skipped
@@ -219,7 +219,7 @@ public class ScrubTest
         }
         catch (IOError err) {}
 
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.SCRUB);
              Scrubber scrubber = new Scrubber(cfs, txn, true, true))
         {
             // with skipCorrupted == true, the corrupt row will be skipped
@@ -331,7 +331,7 @@ public class ScrubTest
             cfs.clearUnsafe();
 
             List<String> keys = Arrays.asList("t", "a", "b", "z", "c", "y", "d");
-            Descriptor desc = cfs.newSSTableDescriptor(tempDataDir);
+            Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(tempDataDir);
 
             LifecycleTransaction txn = LifecycleTransaction.offline(OperationType.WRITE);
             try (SSTableTxnWriter writer = new SSTableTxnWriter(txn, createTestWriter(desc, (long) keys.size(), cfs.metadata, txn)))

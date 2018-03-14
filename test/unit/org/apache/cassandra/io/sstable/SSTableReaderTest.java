@@ -520,7 +520,7 @@ public class SSTableReaderTest
         }
 
         SSTableReader replacement;
-        try (LifecycleTransaction txn = store.getTracker().tryModify(Arrays.asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.UNKNOWN))
         {
             replacement = sstable.cloneWithNewSummarySamplingLevel(store, 1);
             txn.update(replacement, true);
@@ -571,7 +571,7 @@ public class SSTableReaderTest
         assert sstables.size() == 1;
         final SSTableReader sstable = sstables.iterator().next();
 
-        try (LifecycleTransaction txn = store.getTracker().tryModify(Arrays.asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(Arrays.asList(sstable), OperationType.UNKNOWN))
         {
             SSTableReader replacement = sstable.cloneWithNewSummarySamplingLevel(store, sstable.getIndexSummarySamplingLevel() + 1);
             txn.update(replacement, true);

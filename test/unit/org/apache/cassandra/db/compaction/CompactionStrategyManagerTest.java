@@ -191,7 +191,7 @@ public class CompactionStrategyManagerTest
         ColumnFamilyStore cfs = Keyspace.open(KS_PREFIX).getColumnFamilyStore(TABLE_PREFIX);
         MockCFS mockCFS = new MockCFS(cfs, new Directories(cfs.metadata(), directories));
         mockCFS.disableAutoCompaction();
-        mockCFS.addSSTables(cfs.getLiveSSTables());
+        mockCFS.getStorageHandler().addSSTables(cfs.getLiveSSTables());
         return mockCFS;
     }
 

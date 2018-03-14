@@ -102,7 +102,7 @@ public class SizeEstimatesRecorder extends SchemaChangeListener implements Runna
                 {
                     while (refs == null)
                     {
-                        Iterable<SSTableReader> sstables = table.getTracker().getView().select(SSTableSet.CANONICAL);
+                        Iterable<SSTableReader> sstables = table.getStorageHandler().getTracker().getView().select(SSTableSet.CANONICAL);
                         SSTableIntervalTree tree = SSTableIntervalTree.build(sstables);
                         Range<PartitionPosition> r = Range.makeRowRange(unwrappedRange);
                         Iterable<SSTableReader> canonicalSSTables = View.sstablesInBounds(r.left, r.right, tree);

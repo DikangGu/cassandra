@@ -120,7 +120,7 @@ public class CompactionStrategyManager implements INotificationConsumer
     public CompactionStrategyManager(ColumnFamilyStore cfs, Supplier<DiskBoundaries> boundariesSupplier,
                                      boolean partitionSSTablesByTokenRange)
     {
-        cfs.getTracker().subscribe(this);
+        cfs.getStorageHandler().getTracker().subscribe(this);
         logger.trace("{} subscribed to the data tracker.", this);
         this.cfs = cfs;
         this.compactionLogger = new CompactionLogger(cfs, this);
@@ -249,7 +249,7 @@ public class CompactionStrategyManager implements INotificationConsumer
         writeLock.lock();
         try
         {
-            for (SSTableReader sstable : cfs.getSSTables(SSTableSet.CANONICAL))
+            for (SSTableReader sstable : cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL))
             {
                 if (sstable.openReason != SSTableReader.OpenReason.EARLY)
                     compactionStrategyFor(sstable).addSSTable(sstable);
@@ -1285,7 +1285,7 @@ public class CompactionStrategyManager implements INotificationConsumer
             {
                 // if there was an exception mutating repairedAt, we should still notify for the
                 // sstables that we were able to modify successfully before releasing the lock
-                cfs.getTracker().notifySSTableRepairedStatusChanged(changed);
+                cfs.getStorageHandler().getTracker().notifySSTableRepairedStatusChanged(changed);
             }
             finally
             {

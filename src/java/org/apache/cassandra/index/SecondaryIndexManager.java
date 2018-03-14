@@ -168,7 +168,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
     public SecondaryIndexManager(ColumnFamilyStore baseCfs)
     {
         this.baseCfs = baseCfs;
-        baseCfs.getTracker().subscribe(this);
+        baseCfs.getStorageHandler().getTracker().subscribe(this);
     }
 
     /**
@@ -333,7 +333,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
      */
     public void rebuildIndexesBlocking(Set<String> indexNames)
     {
-        try (ColumnFamilyStore.RefViewFragment viewFragment = baseCfs.selectAndReference(View.selectFunction(SSTableSet.CANONICAL));
+        try (ColumnFamilyStore.RefViewFragment viewFragment = baseCfs.getStorageHandler().selectAndReference(View.selectFunction(SSTableSet.CANONICAL));
              Refs<SSTableReader> allSSTables = viewFragment.refs)
         {
             Set<Index> toRebuild = indexes.values().stream()
@@ -780,7 +780,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
         // for each CFS backed index, submit a flush task which we'll wait on for completion
         // for the non-CFS backed indexes, we'll flush those while we wait.
-        synchronized (baseCfs.getTracker())
+        synchronized (baseCfs.getStorageHandler().getTracker())
         {
             indexes.forEach(index ->
                             index.getBackingTable()

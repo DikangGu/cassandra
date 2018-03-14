@@ -116,7 +116,7 @@ public class LongCompactionsTest
             }
             Collection<SSTableReader> readers = SSTableUtils.prepare().write(rows);
             sstables.addAll(readers);
-            store.addSSTables(readers);
+            store.getStorageHandler().addSSTables(readers);
         }
 
         // give garbage collection a bit of time to catch up
@@ -124,7 +124,7 @@ public class LongCompactionsTest
 
         long start = System.nanoTime();
         final int gcBefore = (int) (System.currentTimeMillis() / 1000) - Schema.instance.getTableMetadata(KEYSPACE1, "Standard1").params.gcGraceSeconds;
-        try (LifecycleTransaction txn = store.getTracker().tryModify(sstables, OperationType.COMPACTION))
+        try (LifecycleTransaction txn = store.getStorageHandler().getTracker().tryModify(sstables, OperationType.COMPACTION))
         {
             assert txn != null : "Cannot markCompacting all sstables";
             new CompactionTask(store, txn, gcBefore).execute(null);

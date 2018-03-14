@@ -147,7 +147,7 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
                 return null;
             }
 
-            LifecycleTransaction txn = cfs.getTracker().tryModify(candidate.sstables, OperationType.COMPACTION);
+            LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(candidate.sstables, OperationType.COMPACTION);
             if (txn != null)
             {
                 LeveledCompactionTask newTask = new LeveledCompactionTask(cfs, txn, candidate.level, gcBefore, candidate.maxSSTableBytes, false);
@@ -166,7 +166,7 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
         Iterable<SSTableReader> filteredSSTables = filterSuspectSSTables(sstables);
         if (Iterables.isEmpty(sstables))
             return null;
-        LifecycleTransaction txn = cfs.getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
+        LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
         if (txn == null)
             return null;
         return Arrays.<AbstractCompactionTask>asList(new LeveledCompactionTask(cfs, txn, 0, gcBefore, getMaxSSTableBytes(), true));
@@ -181,7 +181,7 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
         if (sstables.isEmpty())
             return null;
 
-        LifecycleTransaction transaction = cfs.getTracker().tryModify(sstables, OperationType.COMPACTION);
+        LifecycleTransaction transaction = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.COMPACTION);
         if (transaction == null)
         {
             logger.trace("Unable to mark {} for compaction; probably a background compaction got to it first.  You can disable background compactions temporarily if this is a problem", sstables);
@@ -500,7 +500,7 @@ public class LeveledCompactionStrategy extends AbstractCompactionStrategy
             if (sstables.isEmpty())
                 continue;
 
-            Set<SSTableReader> compacting = cfs.getTracker().getCompacting();
+            Set<SSTableReader> compacting = cfs.getStorageHandler().getTracker().getCompacting();
             for (SSTableReader sstable : sstables)
             {
                 if (sstable.getEstimatedDroppableTombstoneRatio(gcBefore) <= tombstoneThreshold)

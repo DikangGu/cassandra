@@ -190,7 +190,7 @@ public class StreamingTransferTest
         {
             long beforeStreaming = System.currentTimeMillis();
             transferRanges(cfs);
-            cfs.discardSSTables(beforeStreaming);
+            cfs.discardDBFiles(beforeStreaming);
             offs = new int[]{2, 3};
         }
 

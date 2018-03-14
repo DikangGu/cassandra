@@ -456,7 +456,7 @@ public class CacheService implements CacheServiceMBean
             int generation = input.readInt();
             input.readBoolean(); // backwards compatibility for "promoted indexes" boolean
             SSTableReader reader;
-            if (cfs == null || !cfs.isKeyCacheEnabled() || (reader = findDesc(generation, cfs.getSSTables(SSTableSet.CANONICAL))) == null)
+            if (cfs == null || !cfs.isKeyCacheEnabled() || (reader = findDesc(generation, cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL))) == null)
             {
                 // The sstable doesn't exist anymore, so we can't be sure of the exact version and assume its the current version. The only case where we'll be
                 // wrong is during upgrade, in which case we fail at deserialization. This is not a huge deal however since 1) this is unlikely enough that

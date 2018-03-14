@@ -371,7 +371,7 @@ public class DateTieredCompactionStrategyTest extends SchemaLoader
         Map<String, String> options = new HashMap<>();
         options.put(SizeTieredCompactionStrategyOptions.MIN_SSTABLE_SIZE_KEY, "1");
         DateTieredCompactionStrategy dtcs = new DateTieredCompactionStrategy(cfs, options);
-        for (SSTableReader sstable : cfs.getSSTables(SSTableSet.CANONICAL))
+        for (SSTableReader sstable : cfs.getStorageHandler().getSSTables(SSTableSet.CANONICAL))
             dtcs.addSSTable(sstable);
         AbstractCompactionTask task = dtcs.getNextBackgroundTask(0);
         assertEquals(20, task.transaction.originals().size());

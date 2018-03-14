@@ -140,7 +140,7 @@ public class IndexSummaryManagerTest
         for (SSTableReader sstable : sstables)
             sstable.overrideReadMeter(new RestorableMeter(100.0, 100.0));
 
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), originalOffHeapSize * sstables.size());
         }
@@ -249,7 +249,7 @@ public class IndexSummaryManagerTest
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval / 2).build(), true);
         SSTableReader sstable = cfs.getLiveSSTables().iterator().next();
         long summarySpace = sstable.getIndexSummaryOffHeapSize();
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), summarySpace);
         }
@@ -261,7 +261,7 @@ public class IndexSummaryManagerTest
         // keep the min_index_interval the same, but now give the summary enough space to grow by 50%
         double previousInterval = sstable.getEffectiveIndexInterval();
         int previousSize = sstable.getIndexSummarySize();
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (long) Math.ceil(summarySpace * 1.5));
         }
@@ -272,7 +272,7 @@ public class IndexSummaryManagerTest
         // return min_index_interval to it's original value (double it), but only give the summary enough space
         // to have an effective index interval of twice the new min
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval).build(), true);
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (long) Math.ceil(summarySpace / 2.0));
         }
@@ -285,7 +285,7 @@ public class IndexSummaryManagerTest
         // result in an effective interval above the new max)
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval * 4).build(), true);
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(originalMinIndexInterval * 4).build(), true);
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 10);
         }
@@ -308,7 +308,7 @@ public class IndexSummaryManagerTest
         for (SSTableReader sstable : sstables)
             sstable.overrideReadMeter(new RestorableMeter(100.0, 100.0));
 
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 10);
         }
@@ -318,7 +318,7 @@ public class IndexSummaryManagerTest
 
         // halve the max_index_interval
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(cfs.metadata().params.maxIndexInterval / 2).build(), true);
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 1);
         }
@@ -331,7 +331,7 @@ public class IndexSummaryManagerTest
 
         // return max_index_interval to its original value
         MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(cfs.metadata().params.maxIndexInterval * 2).build(), true);
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 1);
         }
@@ -362,7 +362,7 @@ public class IndexSummaryManagerTest
         long singleSummaryOffHeapSpace = sstables.get(0).getIndexSummaryOffHeapSize();
 
         // there should be enough space to not downsample anything
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * numSSTables));
         }
@@ -373,7 +373,7 @@ public class IndexSummaryManagerTest
 
         // everything should get cut in half
         assert sstables.size() == 4;
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * (numSSTables / 2)));
         }
@@ -382,7 +382,7 @@ public class IndexSummaryManagerTest
         validateData(cfs, numRows);
 
         // everything should get cut to a quarter
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * (numSSTables / 4)));
         }
@@ -391,7 +391,7 @@ public class IndexSummaryManagerTest
         validateData(cfs, numRows);
 
         // upsample back up to half
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * (numSSTables / 2) + 4));
         }
@@ -401,7 +401,7 @@ public class IndexSummaryManagerTest
         validateData(cfs, numRows);
 
         // upsample back up to the original index summary
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * numSSTables));
         }
@@ -413,7 +413,7 @@ public class IndexSummaryManagerTest
         // so the two cold sstables should get downsampled to be half of their original size
         sstables.get(0).overrideReadMeter(new RestorableMeter(50.0, 50.0));
         sstables.get(1).overrideReadMeter(new RestorableMeter(50.0, 50.0));
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * 3));
         }
@@ -429,7 +429,7 @@ public class IndexSummaryManagerTest
         double higherRate = 50.0 * (UPSAMPLE_THRESHOLD - (UPSAMPLE_THRESHOLD * 0.10));
         sstables.get(0).overrideReadMeter(new RestorableMeter(lowerRate, lowerRate));
         sstables.get(1).overrideReadMeter(new RestorableMeter(higherRate, higherRate));
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * 3));
         }
@@ -447,7 +447,7 @@ public class IndexSummaryManagerTest
         sstables.get(2).overrideReadMeter(new RestorableMeter(1000.0, 1000.0));
         sstables.get(3).overrideReadMeter(new RestorableMeter(1000.0, 1000.0));
 
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (singleSummaryOffHeapSpace * 3) + 50);
         }
@@ -471,7 +471,7 @@ public class IndexSummaryManagerTest
         sstables.get(1).overrideReadMeter(new RestorableMeter(0.0, 0.0));
         sstables.get(2).overrideReadMeter(new RestorableMeter(92, 92));
         sstables.get(3).overrideReadMeter(new RestorableMeter(128.0, 128.0));
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (long) (singleSummaryOffHeapSpace + (singleSummaryOffHeapSpace * (92.0 / BASE_SAMPLING_LEVEL))));
         }
@@ -484,7 +484,7 @@ public class IndexSummaryManagerTest
         validateData(cfs, numRows);
 
         // Don't leave enough space for even the minimal index summaries
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             sstables = redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 10);
         }
@@ -523,7 +523,7 @@ public class IndexSummaryManagerTest
         SSTableReader original = sstables.get(0);
 
         SSTableReader sstable = original;
-        try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
+        try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             for (int samplingLevel = 1; samplingLevel < BASE_SAMPLING_LEVEL; samplingLevel++)
             {
@@ -630,7 +630,7 @@ public class IndexSummaryManagerTest
                 try
                 {
                     // Don't leave enough space for even the minimal index summaries
-                    try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
+                    try (LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.UNKNOWN))
                     {
                         IndexSummaryManager.redistributeSummaries(new ObservableRedistribution(Collections.EMPTY_LIST,
                                                                                                of(cfs.metadata.id, txn),

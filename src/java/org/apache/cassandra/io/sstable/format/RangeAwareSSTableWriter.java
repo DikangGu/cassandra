@@ -72,7 +72,7 @@ public class RangeAwareSSTableWriter implements SSTableMultiWriter
             if (localDir == null)
                 throw new IOException(String.format("Insufficient disk space to store %s",
                                                     FBUtilities.prettyPrintMemory(totalSize)));
-            Descriptor desc = cfs.newSSTableDescriptor(cfs.getDirectories().getLocationForDisk(localDir), format);
+            Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(cfs.getDirectories().getLocationForDisk(localDir), format);
             currentWriter = cfs.createSSTableMultiWriter(desc, estimatedKeys, repairedAt, pendingRepair, sstableLevel, header, txn);
         }
     }
@@ -94,7 +94,7 @@ public class RangeAwareSSTableWriter implements SSTableMultiWriter
             if (currentWriter != null)
                 finishedWriters.add(currentWriter);
 
-            Descriptor desc = cfs.newSSTableDescriptor(cfs.getDirectories().getLocationForDisk(directories.get(currentIndex)), format);
+            Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(cfs.getDirectories().getLocationForDisk(directories.get(currentIndex)), format);
             currentWriter = cfs.createSSTableMultiWriter(desc, estimatedKeys, repairedAt, pendingRepair, sstableLevel, header, txn);
         }
     }

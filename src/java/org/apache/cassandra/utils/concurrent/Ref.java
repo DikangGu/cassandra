@@ -712,7 +712,7 @@ public final class Ref<T> implements RefCounted<T>
             {
                 for (ColumnFamilyStore cfs : ks.getColumnFamilyStores())
                 {
-                    View view = cfs.getTracker().getView();
+                    View view = cfs.getStorageHandler().getTracker().getView();
                     for (SSTableReader reader : view.allKnownSSTables())
                         reader.addTo(expected);
                 }

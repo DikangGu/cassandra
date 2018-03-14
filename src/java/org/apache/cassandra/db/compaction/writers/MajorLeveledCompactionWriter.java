@@ -104,7 +104,7 @@ public class MajorLeveledCompactionWriter extends CompactionAwareWriter
     {
         this.sstableDirectory = location;
         averageEstimatedKeysPerSSTable = Math.round(((double) averageEstimatedKeysPerSSTable * sstablesWritten + partitionsWritten) / (sstablesWritten + 1));
-        sstableWriter.switchWriter(SSTableWriter.create(cfs.newSSTableDescriptor(getDirectories().getLocationForDisk(sstableDirectory)),
+        sstableWriter.switchWriter(SSTableWriter.create(cfs.getStorageHandler().newSSTableDescriptor(getDirectories().getLocationForDisk(sstableDirectory)),
                 keysPerSSTable,
                 minRepairedAt,
                 pendingRepair,

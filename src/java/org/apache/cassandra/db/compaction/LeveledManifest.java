@@ -377,7 +377,7 @@ public class LeveledManifest
                 continue; // mostly this just avoids polluting the debug log with zero scores
             // we want to calculate score excluding compacting ones
             Set<SSTableReader> sstablesInLevel = Sets.newHashSet(sstables);
-            Set<SSTableReader> remaining = Sets.difference(sstablesInLevel, cfs.getTracker().getCompacting());
+            Set<SSTableReader> remaining = Sets.difference(sstablesInLevel, cfs.getStorageHandler().getTracker().getCompacting());
             double score = (double) SSTableReader.getTotalBytes(remaining) / (double)maxBytesForLevel(i, maxSSTableSizeInBytes);
             logger.trace("Compaction score for level {} is {}", i, score);
 
@@ -435,7 +435,7 @@ public class LeveledManifest
 
     private List<SSTableReader> getSSTablesForSTCS(Collection<SSTableReader> sstables)
     {
-        Iterable<SSTableReader> candidates = cfs.getTracker().getUncompacting(sstables);
+        Iterable<SSTableReader> candidates = cfs.getStorageHandler().getTracker().getUncompacting(sstables);
         List<Pair<SSTableReader,Long>> pairs = SizeTieredCompactionStrategy.createSSTableAndLengthPairs(AbstractCompactionStrategy.filterSuspectSSTables(candidates));
         List<List<SSTableReader>> buckets = SizeTieredCompactionStrategy.getBuckets(pairs,
                                                                                     options.bucketHigh,
@@ -490,7 +490,7 @@ public class LeveledManifest
                     }
                     if (min == null || max == null || min.equals(max)) // single partition sstables - we cannot include a high level sstable.
                         return candidates;
-                    Set<SSTableReader> compacting = cfs.getTracker().getCompacting();
+                    Set<SSTableReader> compacting = cfs.getStorageHandler().getTracker().getCompacting();
                     Range<PartitionPosition> boundaries = new Range<>(min, max);
                     for (SSTableReader sstable : getLevel(i))
                     {
@@ -645,7 +645,7 @@ public class LeveledManifest
         assert !getLevel(level).isEmpty();
         logger.trace("Choosing candidates for L{}", level);
 
-        final Set<SSTableReader> compacting = cfs.getTracker().getCompacting();
+        final Set<SSTableReader> compacting = cfs.getStorageHandler().getTracker().getCompacting();
 
         if (level == 0)
         {
@@ -754,7 +754,7 @@ public class LeveledManifest
     {
         Set<SSTableReader> sstables = new HashSet<>();
         Set<SSTableReader> levelSSTables = new HashSet<>(getLevel(level));
-        for (SSTableReader sstable : cfs.getTracker().getCompacting())
+        for (SSTableReader sstable : cfs.getStorageHandler().getTracker().getCompacting())
         {
             if (levelSSTables.contains(sstable))
                 sstables.add(sstable);

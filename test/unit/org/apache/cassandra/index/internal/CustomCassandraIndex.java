@@ -165,14 +165,14 @@ public class CustomCassandraIndex implements Index
         indexCfs = ColumnFamilyStore.createColumnFamilyStore(baseCfs.keyspace,
                                                              cfm.name,
                                                              TableMetadataRef.forOfflineTools(cfm),
-                                                             baseCfs.getTracker().loadsstables);
+                                                             baseCfs.getStorageHandler().getTracker().loadsstables);
         indexedColumn = target.left;
     }
 
     public Callable<?> getTruncateTask(final long truncatedAt)
     {
         return () -> {
-            indexCfs.discardSSTables(truncatedAt);
+            indexCfs.discardDBFiles(truncatedAt);
             return null;
         };
     }
@@ -623,7 +623,7 @@ public class CustomCassandraIndex implements Index
     {
         baseCfs.forceBlockingFlush();
 
-        try (ColumnFamilyStore.RefViewFragment viewFragment = baseCfs.selectAndReference(View.selectFunction(SSTableSet.CANONICAL));
+        try (ColumnFamilyStore.RefViewFragment viewFragment = baseCfs.getStorageHandler().selectAndReference(View.selectFunction(SSTableSet.CANONICAL));
              Refs<SSTableReader> sstables = viewFragment.refs)
         {
             if (sstables.isEmpty())

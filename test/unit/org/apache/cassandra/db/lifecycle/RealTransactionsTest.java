@@ -79,7 +79,7 @@ public class RealTransactionsTest extends SchemaLoader
         ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(REWRITE_FINISHED_CF);
 
         SSTableReader oldSSTable = getSSTable(cfs, 1);
-        LifecycleTransaction txn = cfs.getTracker().tryModify(oldSSTable, OperationType.COMPACTION);
+        LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(oldSSTable, OperationType.COMPACTION);
         SSTableReader newSSTable = replaceSSTable(cfs, txn, false);
         LogTransaction.waitForDeletions();
 
@@ -95,7 +95,7 @@ public class RealTransactionsTest extends SchemaLoader
         ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(REWRITE_ABORTED_CF);
 
         SSTableReader oldSSTable = getSSTable(cfs, 1);
-        LifecycleTransaction txn = cfs.getTracker().tryModify(oldSSTable, OperationType.COMPACTION);
+        LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(oldSSTable, OperationType.COMPACTION);
 
         replaceSSTable(cfs, txn, true);
         LogTransaction.waitForDeletions();
@@ -157,7 +157,7 @@ public class RealTransactionsTest extends SchemaLoader
             {
                 long lastCheckObsoletion = System.nanoTime();
                 File directory = txn.originals().iterator().next().descriptor.directory;
-                Descriptor desc = cfs.newSSTableDescriptor(directory);
+                Descriptor desc = cfs.getStorageHandler().newSSTableDescriptor(directory);
                 TableMetadataRef metadata = Schema.instance.getTableMetadataRef(desc);
                 rewriter.switchWriter(SSTableWriter.create(metadata,
                                                            desc,

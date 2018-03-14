@@ -370,7 +370,7 @@ public class Verifier implements Closeable
             {
                 sstable.descriptor.getMetadataSerializer().mutateRepaired(sstable.descriptor, ActiveRepairService.UNREPAIRED_SSTABLE, sstable.getSSTableMetadata().pendingRepair);
                 sstable.reloadSSTableMetadata();
-                cfs.getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
+                cfs.getStorageHandler().getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
             }
             catch(IOException ioe)
             {

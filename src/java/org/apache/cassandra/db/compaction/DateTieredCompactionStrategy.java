@@ -91,7 +91,7 @@ public class DateTieredCompactionStrategy extends AbstractCompactionStrategy
                 return null;
             }
 
-            LifecycleTransaction modifier = cfs.getTracker().tryModify(latestBucket, OperationType.COMPACTION);
+            LifecycleTransaction modifier = cfs.getStorageHandler().getTracker().tryModify(latestBucket, OperationType.COMPACTION);
             if (modifier != null)
                 return new CompactionTask(cfs, modifier, gcBefore);
             previousCandidate = latestBucket;
@@ -108,14 +108,14 @@ public class DateTieredCompactionStrategy extends AbstractCompactionStrategy
         if (sstables.isEmpty())
             return Collections.emptyList();
 
-        Set<SSTableReader> uncompacting = ImmutableSet.copyOf(filter(cfs.getUncompactingSSTables(), sstables::contains));
+        Set<SSTableReader> uncompacting = ImmutableSet.copyOf(filter(cfs.getStorageHandler().getUncompactingSSTables(), sstables::contains));
 
         Set<SSTableReader> expired = Collections.emptySet();
         // we only check for expired sstables every 10 minutes (by default) due to it being an expensive operation
         if (System.currentTimeMillis() - lastExpiredCheck > options.expiredSSTableCheckFrequency)
         {
             // Find fully expired SSTables. Those will be included no matter what.
-            expired = CompactionController.getFullyExpiredSSTables(cfs, uncompacting, cfs.getOverlappingLiveSSTables(uncompacting), gcBefore);
+            expired = CompactionController.getFullyExpiredSSTables(cfs, uncompacting, cfs.getStorageHandler().getOverlappingLiveSSTables(uncompacting), gcBefore);
             lastExpiredCheck = System.currentTimeMillis();
         }
         Set<SSTableReader> candidates = Sets.newHashSet(filterSuspectSSTables(uncompacting));
@@ -181,7 +181,7 @@ public class DateTieredCompactionStrategy extends AbstractCompactionStrategy
     {
         // no need to convert to collection if had an Iterables.max(), but not present in standard toolkit, and not worth adding
         List<SSTableReader> list = new ArrayList<>();
-        Iterables.addAll(list, cfs.getSSTables(SSTableSet.LIVE));
+        Iterables.addAll(list, cfs.getStorageHandler().getSSTables(SSTableSet.LIVE));
         if (list.isEmpty())
             return 0;
         return Collections.max(list, (o1, o2) -> Long.compare(o1.getMaxTimestamp(), o2.getMaxTimestamp()))
@@ -423,7 +423,7 @@ public class DateTieredCompactionStrategy extends AbstractCompactionStrategy
         Iterable<SSTableReader> filteredSSTables = filterSuspectSSTables(sstables);
         if (Iterables.isEmpty(filteredSSTables))
             return null;
-        LifecycleTransaction txn = cfs.getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
+        LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(filteredSSTables, OperationType.COMPACTION);
         if (txn == null)
             return null;
         return Collections.<AbstractCompactionTask>singleton(new CompactionTask(cfs, txn, gcBefore));
@@ -435,7 +435,7 @@ public class DateTieredCompactionStrategy extends AbstractCompactionStrategy
     {
         assert !sstables.isEmpty(); // checked for by CM.submitUserDefined
 
-        LifecycleTransaction modifier = cfs.getTracker().tryModify(sstables, OperationType.COMPACTION);
+        LifecycleTransaction modifier = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.COMPACTION);
         if (modifier == null)
         {
             logger.trace("Unable to mark {} for compaction; probably a background compaction got to it first.  You can disable background compactions temporarily if this is a problem", sstables);

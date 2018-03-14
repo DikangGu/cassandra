@@ -484,7 +484,7 @@ public class VerifyTest
         SSTableReader sstable = cfs.getLiveSSTables().iterator().next();
         sstable.descriptor.getMetadataSerializer().mutateRepaired(sstable.descriptor, 1, sstable.getSSTableMetadata().pendingRepair);
         sstable.reloadSSTableMetadata();
-        cfs.getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
+        cfs.getStorageHandler().getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
         assertTrue(sstable.isRepaired());
         cfs.forceMajorCompaction();
 

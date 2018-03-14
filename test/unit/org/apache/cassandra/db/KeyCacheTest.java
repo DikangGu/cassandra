@@ -232,7 +232,7 @@ public class KeyCacheTest
         assertKeyCacheSize(0, KEYSPACE1, cf);
 
         // now remove the first sstable from the store to simulate losing the file
-        store.markObsolete(firstFlushTables, OperationType.UNKNOWN);
+        store.getStorageHandler().markObsolete(firstFlushTables, OperationType.UNKNOWN);
 
         // check that reading now correctly skips over lost table and reads the rest (CASSANDRA-10219)
         CacheService.instance.keyCache.loadSaved();

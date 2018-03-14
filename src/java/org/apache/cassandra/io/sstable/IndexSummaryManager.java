@@ -208,11 +208,11 @@ public class IndexSummaryManager implements IndexSummaryManagerMBean
                 LifecycleTransaction txn = null;
                 do
                 {
-                    View view = cfStore.getTracker().getView();
+                    View view = cfStore.getStorageHandler().getTracker().getView();
                     allSSTables = ImmutableSet.copyOf(view.select(SSTableSet.CANONICAL));
                     nonCompacting = ImmutableSet.copyOf(view.getUncompacting(allSSTables));
                 }
-                while (null == (txn = cfStore.getTracker().tryModify(nonCompacting, OperationType.UNKNOWN)));
+                while (null == (txn = cfStore.getStorageHandler().getTracker().tryModify(nonCompacting, OperationType.UNKNOWN)));
 
                 allNonCompacting.put(cfStore.metadata.id, txn);
                 allCompacting.addAll(Sets.difference(allSSTables, nonCompacting));

@@ -106,7 +106,7 @@ public class SASIIndex implements Index, INotificationConsumer
         ColumnMetadata column = TargetParser.parse(baseCfs.metadata(), config).left;
         this.index = new ColumnIndex(baseCfs.metadata().partitionKeyType, column, config);
 
-        Tracker tracker = baseCfs.getTracker();
+        Tracker tracker = baseCfs.getStorageHandler().getTracker();
         tracker.subscribe(this);
 
         SortedMap<SSTableReader, Map<ColumnMetadata, ColumnIndex>> toRebuild = new TreeMap<>((a, b)
@@ -281,7 +281,7 @@ public class SASIIndex implements Index, INotificationConsumer
 
             public void adjustMemtableSize(long additionalSpace, OpOrder.Group opGroup)
             {
-                baseCfs.getTracker().getView().getCurrentMemtable().getAllocator().onHeap().allocate(additionalSpace, opGroup);
+                baseCfs.getStorageHandler().getTracker().getView().getCurrentMemtable().getAllocator().onHeap().allocate(additionalSpace, opGroup);
             }
         };
     }

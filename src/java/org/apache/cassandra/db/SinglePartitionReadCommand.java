@@ -606,7 +606,7 @@ public class SinglePartitionReadCommand extends ReadCommand
             return queryMemtableAndSSTablesInTimestampOrder(cfs, (ClusteringIndexNamesFilter)clusteringIndexFilter());
 
         Tracing.trace("Acquiring sstable references");
-        ColumnFamilyStore.ViewFragment view = cfs.select(View.select(SSTableSet.LIVE, partitionKey()));
+        ColumnFamilyStore.ViewFragment view = cfs.getStorageHandler().select(View.select(SSTableSet.LIVE, partitionKey()));
         List<UnfilteredRowIterator> iterators = new ArrayList<>(Iterables.size(view.memtables) + view.sstables.size());
         ClusteringIndexFilter filter = clusteringIndexFilter();
         long minTimestamp = Long.MAX_VALUE;
@@ -797,7 +797,7 @@ public class SinglePartitionReadCommand extends ReadCommand
     private UnfilteredRowIterator queryMemtableAndSSTablesInTimestampOrder(ColumnFamilyStore cfs, ClusteringIndexNamesFilter filter)
     {
         Tracing.trace("Acquiring sstable references");
-        ColumnFamilyStore.ViewFragment view = cfs.select(View.select(SSTableSet.LIVE, partitionKey()));
+        ColumnFamilyStore.ViewFragment view = cfs.getStorageHandler().select(View.select(SSTableSet.LIVE, partitionKey()));
 
         ImmutableBTreePartition result = null;
 

@@ -263,7 +263,7 @@ public class ActiveRepairServiceTest
     {
         ColumnFamilyStore store = prepareColumnFamilyStore();
         UUID prsId = UUID.randomUUID();
-        Set<SSTableReader> original = Sets.newHashSet(store.select(View.select(SSTableSet.CANONICAL, (s) -> !s.isRepaired())).sstables);
+        Set<SSTableReader> original = Sets.newHashSet(store.getStorageHandler().select(View.select(SSTableSet.CANONICAL, (s) -> !s.isRepaired())).sstables);
         ActiveRepairService.instance.registerParentRepairSession(prsId, FBUtilities.getBroadcastAddressAndPort(), Collections.singletonList(store),
                                                                  Collections.singleton(new Range<>(store.getPartitioner().getMinimumToken(),
                                                                                                    store.getPartitioner().getMinimumToken())),
@@ -279,7 +279,7 @@ public class ActiveRepairServiceTest
                                                                  true, PreviewKind.NONE);
         createSSTables(store, 2);
         ActiveRepairService.instance.getParentRepairSession(prsId).maybeSnapshot(store.metadata.id, prsId);
-        try (Refs<SSTableReader> refs = store.getSnapshotSSTableReaders(prsId.toString()))
+        try (Refs<SSTableReader> refs = store.getStorageHandler().getSnapshotSSTableReaders(prsId.toString()))
         {
             assertEquals(original, Sets.newHashSet(refs.iterator()));
         }

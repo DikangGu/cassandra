@@ -48,7 +48,7 @@ public class RepairedDataTombstonesTest extends CQLTester
             execute("delete from %s where id=? and id2=?", 1, i);
         }
         flush();
-        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         repair(getCurrentColumnFamilyStore(), repairedSSTable);
         Thread.sleep(2000);
         execute("insert into %s (id, id2, t) values (999,999,'live')");
@@ -62,7 +62,7 @@ public class RepairedDataTombstonesTest extends CQLTester
         getCurrentColumnFamilyStore().forceMajorCompaction();
         verifyIncludingPurgeable();
         verify2IncludingPurgeable(1);
-        assertEquals(2, Iterables.size(getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE)));
+        assertEquals(2, Iterables.size(getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE)));
     }
 
     @Test
@@ -74,7 +74,7 @@ public class RepairedDataTombstonesTest extends CQLTester
             execute("delete from %s where id=? and id2=?", 1, i);
         }
         flush();
-        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         repair(getCurrentColumnFamilyStore(), repairedSSTable);
         Thread.sleep(2000);
         for (int i = 10; i < 20; i++)
@@ -86,8 +86,8 @@ public class RepairedDataTombstonesTest extends CQLTester
         getCurrentColumnFamilyStore().forceMajorCompaction();
         verifyIncludingPurgeable();
         verify2IncludingPurgeable(1);
-        assertEquals(1, Iterables.size(getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE)));
-        assertFalse(getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next().isRepaired());
+        assertEquals(1, Iterables.size(getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE)));
+        assertFalse(getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next().isRepaired());
 
     }
 
@@ -100,7 +100,7 @@ public class RepairedDataTombstonesTest extends CQLTester
             execute("update %s set t2=null where id=? and id2=?", 123, i);
         }
         flush();
-        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         repair(getCurrentColumnFamilyStore(), repairedSSTable);
         Thread.sleep(2000);
         for (int i = 10; i < 20; i++)
@@ -142,7 +142,7 @@ public class RepairedDataTombstonesTest extends CQLTester
             execute("delete from %s where id=? and id2=?", 1, i);
         }
         flush();
-        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         repair(getCurrentColumnFamilyStore(), repairedSSTable);
         Thread.sleep(2000);
         for (int i = 10; i < 20; i++)
@@ -164,7 +164,7 @@ public class RepairedDataTombstonesTest extends CQLTester
             execute("delete from %s where id=?", i);
         }
         flush();
-        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTableReader repairedSSTable = getCurrentColumnFamilyStore().getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         repair(getCurrentColumnFamilyStore(), repairedSSTable);
         Thread.sleep(2000);
         for (int i = 10; i < 20; i++)
@@ -310,6 +310,6 @@ public class RepairedDataTombstonesTest extends CQLTester
     {
         sstable.descriptor.getMetadataSerializer().mutateRepaired(sstable.descriptor, 1, null);
         sstable.reloadSSTableMetadata();
-        cfs.getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
+        cfs.getStorageHandler().getTracker().notifySSTableRepairedStatusChanged(Collections.singleton(sstable));
     }
 }

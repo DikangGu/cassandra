@@ -1889,7 +1889,7 @@ public class SASIIndexTest
 
         store.forceBlockingFlush();
 
-        SSTable ssTable = store.getSSTables(SSTableSet.LIVE).iterator().next();
+        SSTable ssTable = store.getStorageHandler().getSSTables(SSTableSet.LIVE).iterator().next();
         Path path = FileSystems.getDefault().getPath(ssTable.getFilename().replace("-Data", "-SI_" + CLUSTERING_CF_NAME_1 + "_age"));
 
         // Overwrite index file with garbage
@@ -2304,7 +2304,7 @@ public class SASIIndexTest
         Assert.assertTrue(beforeFlushMemtable.search(expression).getCount() > 0);
 
         // let's emulate switching memtable and see if we can still read-data in "pending"
-        index.switchMemtable(store.getTracker().getView().getCurrentMemtable());
+        index.switchMemtable(store.getStorageHandler().getTracker().getView().getCurrentMemtable());
 
         Assert.assertNotSame(index.getCurrentMemtable(), beforeFlushMemtable);
         Assert.assertEquals(1, index.getPendingMemtables().size());
@@ -2312,7 +2312,7 @@ public class SASIIndexTest
         Assert.assertTrue(index.searchMemtable(expression).getCount() > 0);
 
         // emulate "everything is flushed" notification
-        index.discardMemtable(store.getTracker().getView().getCurrentMemtable());
+        index.discardMemtable(store.getStorageHandler().getTracker().getView().getCurrentMemtable());
 
         Assert.assertEquals(0, index.getPendingMemtables().size());
         Assert.assertEquals(index.searchMemtable(expression).getCount(), 0);

@@ -195,7 +195,7 @@ public class LongLeveledCompactionStrategyTest
         {
             public Void call() throws Exception
             {
-                Iterable<SSTableReader> allSSTables = store.getSSTables(SSTableSet.LIVE);
+                Iterable<SSTableReader> allSSTables = store.getStorageHandler().getSSTables(SSTableSet.LIVE);
                 for (SSTableReader sstable : allSSTables)
                 {
                     if (sstable.getSSTableLevel() == 0)

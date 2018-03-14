@@ -317,7 +317,7 @@ public class Keyspace
     {
         List<SSTableReader> list = new ArrayList<>(columnFamilyStores.size());
         for (ColumnFamilyStore cfStore : columnFamilyStores.values())
-            Iterables.addAll(list, cfStore.getSSTables(sstableSet));
+            Iterables.addAll(list, cfStore.getStorageHandler().getSSTables(sstableSet));
         return list;
     }
 

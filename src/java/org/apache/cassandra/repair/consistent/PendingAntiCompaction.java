@@ -104,7 +104,7 @@ public class PendingAntiCompaction
             if (sstables.isEmpty())
                 return new AcquireResult(cfs, null, null);
 
-            LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
+            LifecycleTransaction txn = cfs.getStorageHandler().getTracker().tryModify(sstables, OperationType.ANTICOMPACTION);
             if (txn != null)
                 return new AcquireResult(cfs, Refs.ref(sstables), txn);
             else

@@ -87,7 +87,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         csm.getForPendingRepair(repairID).forEach(Assert::assertNull);
 
         // add the sstable
-        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getTracker());
+        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getStorageHandler().getTracker());
         Assert.assertFalse(repairedContains(sstable));
         Assert.assertFalse(unrepairedContains(sstable));
         csm.getForPendingRepair(repairID).forEach(Assert::assertNotNull);
@@ -117,7 +117,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         notification = new SSTableListChangedNotification(Collections.singleton(sstable1),
                                                           Collections.emptyList(),
                                                           OperationType.COMPACTION);
-        csm.handleNotification(notification, cfs.getTracker());
+        csm.handleNotification(notification, cfs.getStorageHandler().getTracker());
 
         csm.getForPendingRepair(repairID).forEach(Assert::assertNotNull);
         Assert.assertFalse(repairedContains(sstable1));
@@ -131,7 +131,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         notification = new SSTableListChangedNotification(Collections.singleton(sstable2),
                                                           Collections.singleton(sstable1),
                                                           OperationType.COMPACTION);
-        csm.handleNotification(notification, cfs.getTracker());
+        csm.handleNotification(notification, cfs.getStorageHandler().getTracker());
 
         Assert.assertFalse(repairedContains(sstable1));
         Assert.assertFalse(unrepairedContains(sstable1));
@@ -158,7 +158,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         // change to pending repaired
         mutateRepaired(sstable, repairID);
         notification = new SSTableRepairStatusChanged(Collections.singleton(sstable));
-        csm.handleNotification(notification, cfs.getTracker());
+        csm.handleNotification(notification, cfs.getStorageHandler().getTracker());
         Assert.assertFalse(unrepairedContains(sstable));
         Assert.assertFalse(repairedContains(sstable));
         csm.getForPendingRepair(repairID).forEach(Assert::assertNotNull);
@@ -167,7 +167,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         // change to repaired
         mutateRepaired(sstable, System.currentTimeMillis());
         notification = new SSTableRepairStatusChanged(Collections.singleton(sstable));
-        csm.handleNotification(notification, cfs.getTracker());
+        csm.handleNotification(notification, cfs.getStorageHandler().getTracker());
         Assert.assertFalse(unrepairedContains(sstable));
         Assert.assertTrue(repairedContains(sstable));
         Assert.assertFalse(pendingContains(repairID, sstable));
@@ -181,12 +181,12 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
 
         SSTableReader sstable = makeSSTable(true);
         mutateRepaired(sstable, repairID);
-        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getTracker());
+        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getStorageHandler().getTracker());
         Assert.assertTrue(pendingContains(repairID, sstable));
 
         // delete sstable
         SSTableDeletingNotification notification = new SSTableDeletingNotification(sstable);
-        csm.handleNotification(notification, cfs.getTracker());
+        csm.handleNotification(notification, cfs.getStorageHandler().getTracker());
         Assert.assertFalse(pendingContains(repairID, sstable));
         Assert.assertFalse(unrepairedContains(sstable));
         Assert.assertFalse(repairedContains(sstable));
@@ -210,7 +210,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
 
         SSTableReader sstable = makeSSTable(true);
         mutateRepaired(sstable, repairID);
-        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getTracker());
+        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getStorageHandler().getTracker());
 
         strategies = csm.getStrategies();
         Assert.assertEquals(3, strategies.size());
@@ -228,7 +228,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         LocalSessionAccessor.prepareUnsafe(repairID, COORDINATOR, PARTICIPANTS);
         SSTableReader sstable = makeSSTable(true);
         mutateRepaired(sstable, repairID);
-        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getTracker());
+        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getStorageHandler().getTracker());
         LocalSessionAccessor.finalizeUnsafe(repairID);
         csm.getForPendingRepair(repairID).forEach(Assert::assertNotNull);
         Assert.assertNotNull(pendingContains(repairID, sstable));
@@ -265,7 +265,7 @@ public class CompactionStrategyManagerPendingRepairTest extends AbstractPendingR
         LocalSessionAccessor.prepareUnsafe(repairID, COORDINATOR, PARTICIPANTS);
         SSTableReader sstable = makeSSTable(true);
         mutateRepaired(sstable, repairID);
-        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getTracker());
+        csm.handleNotification(new SSTableAddedNotification(Collections.singleton(sstable), null), cfs.getStorageHandler().getTracker());
         LocalSessionAccessor.failUnsafe(repairID);
 
         csm.getForPendingRepair(repairID).forEach(Assert::assertNotNull);

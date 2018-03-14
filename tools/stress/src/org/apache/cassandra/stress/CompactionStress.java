@@ -148,7 +148,7 @@ public abstract class CompactionStress implements Runnable
                 throw new IllegalStateException("CompactionStress does not support secondary indexes");
 
             //Register with cfs
-            cfs.addSSTables(sstables);
+            cfs.getStorageHandler().addSSTables(sstables);
         }
 
         return cfs;
