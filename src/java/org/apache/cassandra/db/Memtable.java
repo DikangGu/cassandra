@@ -73,17 +73,17 @@ public class Memtable implements Comparable<Memtable>
         switch (DatabaseDescriptor.getMemtableAllocationType())
         {
             case unslabbed_heap_buffers:
-                return new HeapPool(heapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new ColumnFamilyStore.FlushLargestColumnFamily());
+                return new HeapPool(heapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new CassandraStorageHandler.FlushLargestColumnFamily());
             case heap_buffers:
-                return new SlabPool(heapLimit, 0, DatabaseDescriptor.getMemtableCleanupThreshold(), new ColumnFamilyStore.FlushLargestColumnFamily());
+                return new SlabPool(heapLimit, 0, DatabaseDescriptor.getMemtableCleanupThreshold(), new CassandraStorageHandler.FlushLargestColumnFamily());
             case offheap_buffers:
                 if (!FileUtils.isCleanerAvailable)
                 {
                     throw new IllegalStateException("Could not free direct byte buffer: offheap_buffers is not a safe memtable_allocation_type without this ability, please adjust your config. This feature is only guaranteed to work on an Oracle JVM. Refusing to start.");
                 }
-                return new SlabPool(heapLimit, offHeapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new ColumnFamilyStore.FlushLargestColumnFamily());
+                return new SlabPool(heapLimit, offHeapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new CassandraStorageHandler.FlushLargestColumnFamily());
             case offheap_objects:
-                return new NativePool(heapLimit, offHeapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new ColumnFamilyStore.FlushLargestColumnFamily());
+                return new NativePool(heapLimit, offHeapLimit, DatabaseDescriptor.getMemtableCleanupThreshold(), new CassandraStorageHandler.FlushLargestColumnFamily());
             default:
                 throw new AssertionError();
         }
@@ -144,7 +144,7 @@ public class Memtable implements Comparable<Memtable>
         this.commitLogLowerBound = commitLogLowerBound;
         this.allocator = MEMORY_POOL.newAllocator();
         this.initialComparator = cfs.metadata().comparator;
-        this.cfs.scheduleFlush();
+        this.cfs.getStorageHandler().scheduleFlush();
         this.columnsCollector = new ColumnsCollector(cfs.metadata().regularAndStaticColumns());
     }
 

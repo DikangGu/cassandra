@@ -27,7 +27,7 @@ public class CommitLogCQLTest extends CQLTester
         // Calling switchMemtable directly applies Flush even though memtable is empty. This can happen with some races
         // (flush with recycling by segment manager). It should still tell commitlog that the memtable's region is clean.
         // CASSANDRA-12436
-        cfs.switchMemtable();
+        cfs.getStorageHandler().switchMemtable();
 
         execute("INSERT INTO %s (idx, data) VALUES (?, ?)", 15, Integer.toString(17));
 

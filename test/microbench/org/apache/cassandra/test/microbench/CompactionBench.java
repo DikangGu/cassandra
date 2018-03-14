@@ -121,7 +121,7 @@ public class CompactionBench extends CQLTester
         for (File file : snapshotFiles)
             FileUtils.createHardLink(file, new File(file.toPath().getParent().getParent().getParent().toFile(), file.getName()));
 
-        cfs.loadNewSSTables();
+        cfs.refreshStorage();
     }
 
     @Benchmark

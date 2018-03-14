@@ -377,7 +377,7 @@ public class ScrubTest
                 scrubber.scrub();
             }
             LifecycleTransaction.waitForDeletions();
-            cfs.loadNewSSTables();
+            cfs.refreshStorage();
             assertOrderedAll(cfs, 7);
         }
         finally
@@ -675,7 +675,7 @@ public class ScrubTest
             Files.copy(Paths.get(legacySSTableRoot.toString(), filename), cfs.getDirectories().getDirectoryForNewSSTables().toPath().resolve(filename));
         }
 
-        cfs.loadNewSSTables();
+        cfs.refreshStorage();
 
         cfs.scrub(true, true, false, false, false, 1);
 

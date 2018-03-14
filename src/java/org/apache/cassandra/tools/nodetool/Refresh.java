@@ -37,6 +37,6 @@ public class Refresh extends NodeToolCmd
     public void execute(NodeProbe probe)
     {
         checkArgument(args.size() == 2, "refresh requires ks and cf args");
-        probe.loadNewSSTables(args.get(0), args.get(1));
+        probe.refresh(args.get(0), args.get(1));
     }
 }

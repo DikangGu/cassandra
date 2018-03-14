@@ -584,7 +584,7 @@ public interface StorageServiceMBean extends NotificationEmitter
      * @param ksName The parent keyspace name
      * @param tableName The ColumnFamily name where SSTables belong
      */
-    public void loadNewSSTables(String ksName, String tableName);
+    public void refresh(String ksName, String tableName);
 
     /**
      * Return a List of Tokens representing a sample of keys across all ColumnFamilyStores.

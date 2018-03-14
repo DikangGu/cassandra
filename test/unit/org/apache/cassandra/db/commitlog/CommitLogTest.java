@@ -859,7 +859,7 @@ public abstract class CommitLogTest
             while (!(t instanceof FSWriteError))
                 t = t.getCause();
             // Wait for started flushes to complete.
-            cfs.switchMemtableIfCurrent(current);
+            cfs.getStorageHandler().switchMemtableIfCurrent(current);
         }
     };
 
@@ -871,7 +871,7 @@ public abstract class CommitLogTest
         CommitLog.instance.forceRecycleAllSegments();
 
         // Wait for started flushes to complete.
-        cfs.switchMemtableIfCurrent(current);
+        cfs.getStorageHandler().switchMemtableIfCurrent(current);
     };
 
     @Test

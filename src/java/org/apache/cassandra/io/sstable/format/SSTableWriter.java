@@ -327,7 +327,7 @@ public abstract class SSTableWriter extends SSTable implements Transactional
         // do -Data last because -Data present should mean the sstable was completely renamed before crash
         FileUtils.renameWithConfirm(tmpdesc.filenameFor(Component.DATA), newdesc.filenameFor(Component.DATA));
 
-        // rename it without confirmation because summary can be available for loadNewSSTables but not for closeAndOpenReader
+        // rename it without confirmation because summary can be available for refresh but not for closeAndOpenReader
         FileUtils.renameWithOutConfirm(tmpdesc.filenameFor(Component.SUMMARY), newdesc.filenameFor(Component.SUMMARY));
     }
 

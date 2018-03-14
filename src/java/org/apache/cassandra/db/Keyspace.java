@@ -181,7 +181,7 @@ public class Keyspace
             for (ColumnFamilyStore baseCfs : keyspace.getColumnFamilyStores())
             {
                 for (ColumnFamilyStore cfs : baseCfs.concatWithIndexes())
-                    cfs.maybeRemoveUnreadableSSTables(directory);
+                    cfs.maybeRemoveUnreadableDirectory(directory);
             }
         }
     }

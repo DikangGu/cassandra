@@ -411,7 +411,7 @@ public class LegacySSTableTest
             copySstablesToTestData(legacyVersion, table, cfDir);
         }
 
-        cfs.loadNewSSTables();
+        cfs.refreshStorage();
     }
 
     /**

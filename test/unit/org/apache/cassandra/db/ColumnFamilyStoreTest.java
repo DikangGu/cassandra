@@ -379,7 +379,7 @@ public class ColumnFamilyStoreTest
 //        {
 //            // avoid duplicate hardlinks to incremental backups
 //            DatabaseDescriptor.setIncrementalBackupsEnabled(false);
-//            cfs.loadNewSSTables();
+//            cfs.refresh();
 //        }
 //        finally
 //        {

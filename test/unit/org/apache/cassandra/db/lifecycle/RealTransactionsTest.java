@@ -141,7 +141,7 @@ public class RealTransactionsTest extends SchemaLoader
                 writer.addRow(String.format("key%d", j), "col1", "0");
         }
 
-        cfs.loadNewSSTables();
+        cfs.refreshStorage();
     }
 
     private SSTableReader replaceSSTable(ColumnFamilyStore cfs, LifecycleTransaction txn, boolean fail)
