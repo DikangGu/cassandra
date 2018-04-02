@@ -19,7 +19,9 @@ package org.apache.cassandra.cql3.restrictions;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.stream.Collectors;
 
+import org.apache.cassandra.db.marshal.ListType;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.Term.Terminal;
@@ -247,7 +249,19 @@ public abstract class MultiColumnRestriction implements SingleRestriction
                                          SecondaryIndexManager indexManager,
                                          QueryOptions options)
         {
-            throw  invalidRequest("IN restrictions are not supported on indexed columns");
+            //throw  invalidRequest("IN restrictions are not supported on indexed columns");
+            List<List<ByteBuffer>> byteBufferValues = splitValues(options);
+            for (int i = 0; i < columnDefs.size(); i++)
+            {
+                ColumnMetadata columnDef = columnDefs.get(i);
+                List inValues = byteBufferValues.get(i)
+                                .stream()
+                                .map(bytes -> columnDef.type.getSerializer().deserialize(bytes))
+                                .collect(Collectors.toList());
+                filter.add(columnDef, Operator.IN, ListType.getInstance(columnDef.type, false)
+                                                           .getSerializer().serialize(inValues));
+            }
+
         }
 
         protected abstract List<List<ByteBuffer>> splitValues(QueryOptions options);

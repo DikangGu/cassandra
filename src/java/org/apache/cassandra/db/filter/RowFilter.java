@@ -584,6 +584,7 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
             switch (operator)
             {
                 case EQ:
+                case IN:
                 case LT:
                 case LTE:
                 case GTE:
@@ -677,10 +678,10 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
                         return foundValue != null && mapType.getSerializer().getSerializedValue(foundValue, value, mapType.getKeysType()) != null;
                     }
 
-                case IN:
-                    // It wouldn't be terribly hard to support this (though doing so would imply supporting
-                    // IN for 2ndary index) but currently we don't.
-                    throw new AssertionError();
+//                case IN:
+//                    // It wouldn't be terribly hard to support this (though doing so would imply supporting
+//                    // IN for 2ndary index) but currently we don't.
+//                    throw new AssertionError();
             }
             throw new AssertionError();
         }

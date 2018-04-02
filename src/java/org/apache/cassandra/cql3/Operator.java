@@ -110,6 +110,7 @@ public enum Operator
 
         public boolean isSatisfiedBy(AbstractType<?> type, ByteBuffer leftOperand, ByteBuffer rightOperand)
         {
+            // TODO: we could optimize this, avoid the deserialization in every comparison.
             List<?> inValues = ListType.getInstance(type, false).getSerializer().deserialize(rightOperand);
             return inValues.contains(type.getSerializer().deserialize(leftOperand));
         }

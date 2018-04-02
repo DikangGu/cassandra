@@ -21,7 +21,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import org.apache.cassandra.db.marshal.ListType;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.Term.Terminal;
@@ -218,7 +220,15 @@ public abstract class SingleColumnRestriction implements SingleRestriction
                                    SecondaryIndexManager indexManager,
                                    QueryOptions options)
         {
-            throw invalidRequest("IN restrictions are not supported on indexed columns");
+            //throw invalidRequest("IN restrictions are not supported on indexed columns");
+            List<ByteBuffer> byteBufferValue = getValues(options);
+            List inValues = byteBufferValue
+                            .stream()
+                            .map(bytes -> columnDef.type.getSerializer().deserialize(bytes))
+                            .collect(Collectors.toList());
+
+            filter.add(columnDef, Operator.IN, ListType.getInstance(columnDef.type, false)
+                                                       .getSerializer().serialize(inValues));
         }
 
         @Override
