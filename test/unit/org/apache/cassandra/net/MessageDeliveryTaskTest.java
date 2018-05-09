@@ -38,13 +38,13 @@ public class MessageDeliveryTaskTest
     public static void before()
     {
         DatabaseDescriptor.daemonInitialization();
-        MessagingService.instance().registerVerbHandlers(MessagingService.Verb.UNUSED_2, VERB_HANDLER);
+        MessagingService.instance().registerVerbHandlers(MessagingService.Verb.UNUSED_3, VERB_HANDLER);
     }
 
     @AfterClass
     public static void after()
     {
-        MessagingService.instance().removeVerbHandler(MessagingService.Verb.UNUSED_2);
+        MessagingService.instance().removeVerbHandler(MessagingService.Verb.UNUSED_3);
     }
 
     @Before
@@ -57,7 +57,7 @@ public class MessageDeliveryTaskTest
     public void process_HappyPath() throws UnknownHostException
     {
         InetAddressAndPort addr = InetAddressAndPort.getByName("127.0.0.1");
-        MessageIn msg = MessageIn.create(addr, null, Collections.emptyMap(), MessagingService.Verb.UNUSED_2, 1);
+        MessageIn msg = MessageIn.create(addr, null, Collections.emptyMap(), MessagingService.Verb.UNUSED_3, 1);
         MessageDeliveryTask task = new MessageDeliveryTask(msg, 42);
         Assert.assertTrue(task.process());
         Assert.assertEquals(1, VERB_HANDLER.invocationCount);
@@ -97,7 +97,7 @@ public class MessageDeliveryTaskTest
     public void process_ExpiredMessage() throws UnknownHostException
     {
         InetAddressAndPort addr = InetAddressAndPort.getByName("127.0.0.1");
-        MessageIn msg = MessageIn.create(addr, null, Collections.emptyMap(), MessagingService.Verb.UNUSED_2, 1, 0);
+        MessageIn msg = MessageIn.create(addr, null, Collections.emptyMap(), MessagingService.Verb.UNUSED_3, 1, 0);
         MessageDeliveryTask task = new MessageDeliveryTask(msg, 42);
         Assert.assertTrue(task.process());
         Assert.assertEquals(1, VERB_HANDLER.invocationCount);

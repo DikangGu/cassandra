@@ -48,6 +48,8 @@ import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.service.reads.AbstractReadExecutor;
 import org.apache.cassandra.service.reads.DataResolver;
 import org.apache.cassandra.service.reads.ReadCallback;
+import org.apache.cassandra.service.reads.ResponseResolver;
+import org.apache.cassandra.service.reads.repair.NoopReadRepair;
 import org.apache.cassandra.service.reads.repair.ReadRepair;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -69,6 +71,8 @@ import org.apache.cassandra.index.Index;
 import org.apache.cassandra.locator.*;
 import org.apache.cassandra.metrics.*;
 import org.apache.cassandra.net.*;
+import org.apache.cassandra.service.paxos.PrepareAndReadCallback;
+import org.apache.cassandra.service.paxos.PrepareAndReadCommand;
 import org.apache.cassandra.service.paxos.Commit;
 import org.apache.cassandra.service.paxos.PaxosState;
 import org.apache.cassandra.service.paxos.PrepareCallback;
@@ -216,6 +220,9 @@ public class StorageProxy implements StorageProxyMBean
      *  values) between the prepare and accept phases.  This gives us a slightly longer window for another
      *  coordinator to come along and trump our own promise with a newer one but is otherwise safe.
      *
+     *  In the case of USE_FASTPAXOS enabled, we piggyback the read results in the Prepare responses, so that
+     *  we do not need to spend a separate round trip to do the quorum read.
+     *
      * @param keyspaceName the keyspace for the CAS
      * @param cfName the column family for the CAS
      * @param key the row key for the row to CAS
@@ -252,18 +259,39 @@ public class StorageProxy implements StorageProxyMBean
                 PaxosParticipants p = getPaxosParticipants(metadata, key, consistencyForPaxos);
                 List<InetAddressAndPort> liveEndpoints = p.liveEndpoints;
                 int requiredParticipants = p.participants;
-
-                final PaxosBallotAndContention pair = beginAndRepairPaxos(queryStartNanoTime, key, metadata, liveEndpoints, requiredParticipants, consistencyForPaxos, consistencyForCommit, true, state);
-                final UUID ballot = pair.ballot;
-                contentions += pair.contentions;
-
+                
                 // read the current values and check they validate the conditions
                 Tracing.trace("Reading existing values for CAS precondition");
                 SinglePartitionReadCommand readCommand = (SinglePartitionReadCommand) request.readCommand(FBUtilities.nowInSeconds());
                 ConsistencyLevel readConsistency = consistencyForPaxos == ConsistencyLevel.LOCAL_SERIAL ? ConsistencyLevel.LOCAL_QUORUM : ConsistencyLevel.QUORUM;
-
                 FilteredPartition current;
-                try (RowIterator rowIter = readOne(readCommand, readConsistency, queryStartNanoTime))
+
+                final BeginAndRepairPaxosResult result = beginAndRepairPaxos(queryStartNanoTime,
+                                                                             key, metadata,
+                                                                             liveEndpoints,
+                                                                             requiredParticipants,
+                                                                             consistencyForPaxos,
+                                                                             consistencyForCommit,
+                                                                             true,
+                                                                             state,
+                                                                             PaxosState.USE_FASTPAXOS,
+                                                                             readCommand);
+                UUID ballot = result.ballot;
+                contentions += result.contentions;
+                PartitionIterator iterator;
+
+                if (PaxosState.USE_FASTPAXOS)
+                {
+                    // we already piggyback the read response in the result
+                    iterator = result.iterator;
+                }
+                else
+                {
+                    iterator = read(SinglePartitionReadCommand.Group.one(readCommand), readConsistency,
+                                    state, queryStartNanoTime);
+                }
+
+                try (RowIterator rowIter = PartitionIterators.getOnlyElement(iterator, readCommand))
                 {
                     current = FilteredPartition.create(rowIter);
                 }
@@ -340,7 +368,11 @@ public class StorageProxy implements StorageProxyMBean
     private static void recordCasContention(int contentions)
     {
         if(contentions > 0)
+        {
             casWriteMetrics.contention.update(contentions);
+            if (logger.isDebugEnabled())
+                logger.debug("# of contentions: " + contentions);
+        }
     }
 
     private static Predicate<InetAddressAndPort> sameDCPredicateFor(final String dc)
@@ -392,20 +424,23 @@ public class StorageProxy implements StorageProxyMBean
      * @return the Paxos ballot promised by the replicas if no in-progress requests were seen and a quorum of
      * nodes have seen the mostRecentCommit.  Otherwise, return null.
      */
-    private static PaxosBallotAndContention beginAndRepairPaxos(long queryStartNanoTime,
-                                                           DecoratedKey key,
-                                                           TableMetadata metadata,
-                                                           List<InetAddressAndPort> liveEndpoints,
-                                                           int requiredParticipants,
-                                                           ConsistencyLevel consistencyForPaxos,
-                                                           ConsistencyLevel consistencyForCommit,
-                                                           final boolean isWrite,
-                                                           ClientState state)
+    private static BeginAndRepairPaxosResult beginAndRepairPaxos(long queryStartNanoTime,
+                                                                 DecoratedKey key,
+                                                                 TableMetadata metadata,
+                                                                 List<InetAddressAndPort> liveEndpoints,
+                                                                 int requiredParticipants,
+                                                                 ConsistencyLevel consistencyForPaxos,
+                                                                 ConsistencyLevel consistencyForCommit,
+                                                                 final boolean isWrite,
+                                                                 ClientState state,
+                                                                 boolean piggybackReadResponse,
+                                                                 SinglePartitionReadCommand readCommand)
     throws WriteTimeoutException, WriteFailureException
     {
         long timeout = TimeUnit.MILLISECONDS.toNanos(DatabaseDescriptor.getCasContentionTimeout());
 
         PrepareCallback summary = null;
+        PartitionIterator iterator = null;
         int contentions = 0;
         while (System.nanoTime() - queryStartNanoTime < timeout)
         {
@@ -422,7 +457,25 @@ public class StorageProxy implements StorageProxyMBean
             // prepare
             Tracing.trace("Preparing {}", ballot);
             Commit toPrepare = Commit.newPrepare(key, metadata, ballot);
-            summary = preparePaxos(toPrepare, liveEndpoints, requiredParticipants, consistencyForPaxos, queryStartNanoTime);
+
+            if(piggybackReadResponse)
+            {
+                PrepareAndReadCallback callback = preparePaxosAndRead(metadata.keyspace,
+                                                                      toPrepare,
+                                                                      liveEndpoints,
+                                                                      requiredParticipants,
+                                                                      consistencyForPaxos,
+                                                                      queryStartNanoTime,
+                                                                      readCommand);
+                summary = callback.prepareCallback;
+                iterator = callback.iterator;
+            }
+            else
+            {
+                summary = preparePaxos(toPrepare, liveEndpoints, requiredParticipants,
+                                       consistencyForPaxos, queryStartNanoTime);
+            }
+            
             if (!summary.promised)
             {
                 Tracing.trace("Some replicas have already promised a higher ballot than ours; aborting");
@@ -485,7 +538,7 @@ public class StorageProxy implements StorageProxyMBean
                 continue;
             }
 
-            return new PaxosBallotAndContention(ballot, contentions);
+            return new BeginAndRepairPaxosResult(ballot, contentions, iterator);
         }
 
         recordCasContention(contentions);
@@ -500,6 +553,40 @@ public class StorageProxy implements StorageProxyMBean
         MessageOut<Commit> message = new MessageOut<Commit>(MessagingService.Verb.PAXOS_COMMIT, commit, Commit.serializer);
         for (InetAddressAndPort target : replicas)
             MessagingService.instance().sendOneWay(message, target);
+    }
+    
+    private static PrepareAndReadCallback preparePaxosAndRead(String keyspaceName,
+                                                              Commit toPrepare,
+                                                              List<InetAddressAndPort> liveEndpoints,
+                                                              int requiredParticipants,
+                                                              ConsistencyLevel consistencyForPaxos,
+                                                              long queryStartNanoTime,
+                                                              SinglePartitionReadCommand readCommand)
+    {
+        PrepareCallback prepareCallback = new PrepareCallback(toPrepare.update.partitionKey(),
+                                                              toPrepare.update.metadata(),
+                                                              requiredParticipants,
+                                                              consistencyForPaxos,
+                                                              queryStartNanoTime);
+
+        ConsistencyLevel consistencyForRead = consistencyForPaxos == ConsistencyLevel.LOCAL_SERIAL ? ConsistencyLevel.LOCAL_QUORUM : ConsistencyLevel.QUORUM;
+
+        Keyspace keyspace = Keyspace.open(keyspaceName);
+        ResponseResolver resolver = new DataResolver(keyspace, readCommand, consistencyForRead, liveEndpoints.size(),
+                                                     queryStartNanoTime, NoopReadRepair.instance);
+        ReadCallback readCallback = new ReadCallback(resolver, consistencyForRead, readCommand, liveEndpoints,
+                                                     queryStartNanoTime, NoopReadRepair.instance);
+
+        PrepareAndReadCallback callback = new PrepareAndReadCallback(prepareCallback, readCallback);
+        PrepareAndReadCommand prepareCommand = new PrepareAndReadCommand(toPrepare, readCommand);
+        MessageOut<PrepareAndReadCommand> message = new MessageOut<>(Verb.PAXOS_PREPARE_AND_READ, prepareCommand, PrepareAndReadCommand.serializer);
+        for (InetAddressAndPort target : liveEndpoints)
+        {
+            // Probably can optimize for local requests later
+            MessagingService.instance().sendRR(message, target, callback);
+        }
+        callback.await();
+        return callback;
     }
 
     private static PrepareCallback preparePaxos(Commit toPrepare, List<InetAddressAndPort> endpoints, int requiredParticipants, ConsistencyLevel consistencyForPaxos, long queryStartNanoTime)
@@ -1657,7 +1744,7 @@ public class StorageProxy implements StorageProxyMBean
         TableMetadata metadata = command.metadata();
         DecoratedKey key = command.partitionKey();
 
-        PartitionIterator result = null;
+        PartitionIterator partitionIterator = null;
         try
         {
             // make sure any in-progress paxos writes are done (i.e., committed to a majority of replicas), before performing a quorum read
@@ -1672,20 +1759,32 @@ public class StorageProxy implements StorageProxyMBean
 
             try
             {
-                final PaxosBallotAndContention pair = beginAndRepairPaxos(start, key, metadata, liveEndpoints, requiredParticipants, consistencyLevel, consistencyForCommitOrFetch, false, state);
-                if (pair.contentions > 0)
-                    casReadMetrics.contention.update(pair.contentions);
+                final BeginAndRepairPaxosResult paxosResult = beginAndRepairPaxos(start, key, metadata,
+                                                                                  liveEndpoints, requiredParticipants,
+                                                                                  consistencyLevel,
+                                                                                  consistencyForCommitOrFetch,
+                                                                                  false,
+                                                                                  state,
+                                                                                  PaxosState.USE_FASTPAXOS,
+                                                                                  command);
+                if (paxosResult.contentions > 0)
+                    casReadMetrics.contention.update(paxosResult.contentions);
+
+                if (PaxosState.USE_FASTPAXOS)
+                    partitionIterator = paxosResult.iterator;
+                else
+                    partitionIterator = fetchRows(group.queries, consistencyForCommitOrFetch, queryStartNanoTime);
             }
             catch (WriteTimeoutException e)
             {
-                throw new ReadTimeoutException(consistencyLevel, 0, consistencyLevel.blockFor(Keyspace.open(metadata.keyspace)), false);
+                throw new ReadTimeoutException(consistencyLevel, 0,
+                                               consistencyLevel.blockFor(Keyspace.open(metadata.keyspace)),
+                                               false);
             }
             catch (WriteFailureException e)
             {
                 throw new ReadFailureException(consistencyLevel, e.received, e.blockFor, false, e.failureReasonByEndpoint);
             }
-
-            result = fetchRows(group.queries, consistencyForCommitOrFetch, queryStartNanoTime);
         }
         catch (UnavailableException e)
         {
@@ -1717,7 +1816,7 @@ public class StorageProxy implements StorageProxyMBean
             Keyspace.open(metadata.keyspace).getColumnFamilyStore(metadata.name).metric.coordinatorReadLatency.update(latency, TimeUnit.NANOSECONDS);
         }
 
-        return result;
+        return partitionIterator;
     }
 
     @SuppressWarnings("resource")
@@ -2829,7 +2928,6 @@ public class StorageProxy implements StorageProxyMBean
         DatabaseDescriptor.setOtcBacklogExpirationInterval(intervalInMillis);
     }
 
-
     static class PaxosParticipants
     {
         final List<InetAddressAndPort> liveEndpoints;
@@ -2859,32 +2957,38 @@ public class StorageProxy implements StorageProxyMBean
         }
     }
 
-    static class PaxosBallotAndContention
+    static class BeginAndRepairPaxosResult
     {
         final UUID ballot;
         final int contentions;
+        final PartitionIterator iterator;
 
-        PaxosBallotAndContention(UUID ballot, int contentions)
+        BeginAndRepairPaxosResult(UUID ballot, int contentions, PartitionIterator iterator)
         {
             this.ballot = ballot;
             this.contentions = contentions;
+            this.iterator = iterator;
         }
 
         @Override
         public final int hashCode()
         {
             int hashCode = 31 + (ballot == null ? 0 : ballot.hashCode());
-            return 31 * hashCode * this.contentions;
+            hashCode = 31 * hashCode + this.contentions;
+            hashCode = 31 * hashCode + (iterator == null ? 0 : iterator.hashCode());
+            return hashCode;
         }
 
         @Override
         public final boolean equals(Object o)
         {
-            if(!(o instanceof PaxosBallotAndContention))
+            if(!(o instanceof BeginAndRepairPaxosResult))
                 return false;
-            PaxosBallotAndContention that = (PaxosBallotAndContention)o;
+            BeginAndRepairPaxosResult that = (BeginAndRepairPaxosResult)o;
             // handles nulls properly
-            return Objects.equals(ballot, that.ballot) && contentions == that.contentions;
+            return Objects.equals(ballot, that.ballot)
+                   && contentions == that.contentions
+                   && Objects.equals(iterator, that.iterator);
         }
     }
 }

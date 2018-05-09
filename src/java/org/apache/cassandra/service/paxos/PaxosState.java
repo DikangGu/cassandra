@@ -32,6 +32,8 @@ import org.apache.cassandra.utils.UUIDGen;
 
 public class PaxosState
 {
+    public static final boolean USE_FASTPAXOS = Boolean.getBoolean("cassandra.use_fastpaxos");
+    
     private static final Striped<Lock> LOCKS = Striped.lazyWeakLock(DatabaseDescriptor.getConcurrentWriters() * 1024);
 
     private final Commit promised;

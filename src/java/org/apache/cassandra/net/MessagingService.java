@@ -104,6 +104,8 @@ import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.service.AbstractWriteResponseHandler;
 import org.apache.cassandra.service.StorageProxy;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.service.paxos.PrepareAndReadCommand;
+import org.apache.cassandra.service.paxos.PrepareAndReadResponse;
 import org.apache.cassandra.service.paxos.Commit;
 import org.apache.cassandra.service.paxos.PrepareResponse;
 import org.apache.cassandra.tracing.TraceState;
@@ -261,6 +263,13 @@ public final class MessagingService implements MessagingServiceMBean
                 return DatabaseDescriptor.getPingTimeout();
             }
         },
+        PAXOS_PREPARE_AND_READ
+        {
+            public long getTimeout()
+            {
+                return DatabaseDescriptor.getReadRpcTimeout();
+            }
+        },
 
         // UNUSED verbs were used as padding for backward/forward compatability before 4.0,
         // but it wasn't quite as bullet/future proof as needed. We still need to keep these entries
@@ -268,7 +277,6 @@ public final class MessagingService implements MessagingServiceMBean
         // For now, though, the UNUSED are legacy values (placeholders, basically) that should only be used
         // for correctly adding VERBs that need to be emergency additions to 3.0/3.11.
         // We can reclaim them (their id's, to be correct) in future versions, if desireed, though.
-        UNUSED_2,
         UNUSED_3,
         UNUSED_4,
         UNUSED_5,
@@ -359,13 +367,12 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.REPLICATION_FINISHED, Stage.MISC);
         put(Verb.SNAPSHOT, Stage.MISC);
         put(Verb.ECHO, Stage.GOSSIP);
+        put(Verb.PING, Stage.READ);
+        put(Verb.PAXOS_PREPARE_AND_READ, Stage.MUTATION);
 
-        put(Verb.UNUSED_2, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_3, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_4, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_5, Stage.INTERNAL_RESPONSE);
-
-        put(Verb.PING, Stage.READ);
     }};
 
     /**
@@ -401,6 +408,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.PAXOS_PREPARE, Commit.serializer);
         put(Verb.PAXOS_PROPOSE, Commit.serializer);
         put(Verb.PAXOS_COMMIT, Commit.serializer);
+        put(Verb.PAXOS_PREPARE_AND_READ, PrepareAndReadCommand.serializer);
         put(Verb.HINT, HintMessage.serializer);
         put(Verb.BATCH_STORE, Batch.serializer);
         put(Verb.BATCH_REMOVE, UUIDSerializer.serializer);
@@ -429,6 +437,7 @@ public final class MessagingService implements MessagingServiceMBean
 
         put(Verb.PAXOS_PREPARE, PrepareResponse.serializer);
         put(Verb.PAXOS_PROPOSE, BooleanSerializer.serializer);
+        put(Verb.PAXOS_PREPARE_AND_READ, PrepareAndReadResponse.serializer);
 
         put(Verb.BATCH_STORE, WriteResponse.serializer);
         put(Verb.BATCH_REMOVE, WriteResponse.serializer);
